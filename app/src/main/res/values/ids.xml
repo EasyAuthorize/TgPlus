@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="Btn_start" type="id"></item>
+	<item name="Btn_stop" type="id"></item>
+</resources>

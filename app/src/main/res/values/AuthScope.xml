@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="TgApp">
+        <!-- TG -->
+        <item>org.telegram.messenger</item>
+        <!-- TG-WEB -->
+        <item>org.telegram.messenger.web</item>
+    </string-array>
+</resources>
