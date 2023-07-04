@@ -8,8 +8,8 @@ android {
         applicationId "com.easy.tgPlus"
         minSdkVersion 19
         targetSdkVersion 23
-        versionCode 1
-        versionName "1.0"
+        versionCode 10001
+        versionName "1.0.1"
     }
 
     buildTypes {
@@ -21,6 +21,7 @@ android {
 }
 
 dependencies {
+	//编译器不支持 provided
 	compile files('libs/XposedBridgeAPI-89.jar')
     //implementation fileTree(dir: "libs", include: ["*.jar"])
 }

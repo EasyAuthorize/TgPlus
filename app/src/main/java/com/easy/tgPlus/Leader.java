@@ -62,8 +62,8 @@ public class Leader implements IXposedHookLoadPackage,IXposedHookInitPackageReso
 			rawStr = resparam.res.getString(id);
 			resparam.res.setReplacement(en, "Telegram(Web)");
 			logStringResHook(id, rawStr);
-            return;
-        }
+			return;
+		}
 
 	}
 
@@ -98,9 +98,7 @@ public class Leader implements IXposedHookLoadPackage,IXposedHookInitPackageReso
 
 		//解锁复制保存
 		XposedHelpers.findAndHookMethod("org.telegram.messenger.MessagesController", lpparam.classLoader, "isChatNoForwards", lpparam.classLoader.loadClass("org.telegram.tgnet.TLRPC$Chat"), XC_MethodReplacement.returnConstant(false));
-		
-		//if(true)return;
-		
+
 		//复读机
 		final Class<?> AndroidUtilities = lpparam.classLoader.loadClass("org.telegram.messenger.AndroidUtilities");
 		final Class<?> abm = lpparam.classLoader.loadClass("org.telegram.ui.ActionBar.ActionBarMenuSubItem");
@@ -122,19 +120,25 @@ public class Leader implements IXposedHookLoadPackage,IXposedHookInitPackageReso
 													 @Override
 													 public void onClick(View v) {
 														 XposedHelpers.callMethod(main, "closeMenu", new Class[]{boolean.class}, new Object[]{true});
-														 Object selectedObject = XposedHelpers.getObjectField(main,"selectedObject");
-														 Object selectedObjectGroup = XposedHelpers.getObjectField(main,"selectedObjectGroup");
-														 SpannableStringBuilder content = (SpannableStringBuilder)XposedHelpers.callMethod(main,"getMessageContent",new Class[]{selectedObject.getClass(),long.class,boolean.class},new Object[]{selectedObject,0,false});
-														 Object sendMsgHelper = XposedHelpers.callMethod(main,"getSendMessagesHelper");
-														 
+														 Object selectedObject = XposedHelpers.getObjectField(main, "selectedObject");
+														 Object selectedObjectGroup = XposedHelpers.getObjectField(main, "selectedObjectGroup");
+														 Object threadMessageObject = XposedHelpers.getObjectField(main, "threadMessageObject");
+														 SpannableStringBuilder content = (SpannableStringBuilder)XposedHelpers.callMethod(main, "getMessageContent", new Class[]{selectedObject.getClass(),long.class,boolean.class}, new Object[]{selectedObject,0,false});
+														 Object sendMsgHelper = XposedHelpers.callMethod(main, "getSendMessagesHelper");
+
 														 try {
 															 Class<?> msgObj = lpparam.classLoader.loadClass("org.telegram.messenger.MessageObject");
 															 Class<?> rpcWebPage = lpparam.classLoader.loadClass("org.telegram.tgnet.TLRPC$WebPage");
 															 Class<?> rpcReplyMarkup = lpparam.classLoader.loadClass("org.telegram.tgnet.TLRPC$ReplyMarkup");
 															 Class<?> msgObjSendData = lpparam.classLoader.loadClass("org.telegram.messenger.MessageObject$SendAnimationData");
 															 //这里还需要判断消息类型调用对应的send方法
-															 XposedHelpers.callMethod(sendMsgHelper, "sendMessage", new Class[]{String.class,long.class,msgObj,msgObj,rpcWebPage,boolean.class,ArrayList.class,rpcReplyMarkup,HashMap.class,boolean.class,int.class,msgObjSendData,boolean.class}, new Object[]{content.toString(),XposedHelpers.getObjectField(main,"dialog_id"),null, null, null, false, null, null, null, true, 0, null, false});
-															 Toast.makeText(con, "复读机:"+content.toString() ,Toast.LENGTH_SHORT).show();
+															 XposedHelpers.callMethod(sendMsgHelper, "sendMessage", 
+																					  new Class[]{String.class,long.class,msgObj,msgObj,rpcWebPage,boolean.class,ArrayList.class,rpcReplyMarkup,HashMap.class,boolean.class,int.class,msgObjSendData,boolean.class}, 
+																					  new Object[]{content.toString(),
+																						  //XposedHelpers.callMethod(selectedObject,"getDialogId"),
+																						  XposedHelpers.getObjectField(main, "dialog_id"),
+																						  threadMessageObject, threadMessageObject, null, true, null, null, null, true, 0, null, false});
+															 Toast.makeText(con, "复读机:" + content.toString() , Toast.LENGTH_SHORT).show();
 														 } catch (ClassNotFoundException e) {
 															 XposedBridge.log(e);
 														 }
@@ -145,12 +149,16 @@ public class Leader implements IXposedHookLoadPackage,IXposedHookInitPackageReso
 				}
 			});
 
+		
+		if (!BuildConfig.DEBUG)return;
+
 		//debug
 		if (isWebPackage) {
 			//打印getString调用堆栈
 			XposedHelpers.findAndHookMethod("org.telegram.messenger.LocaleController", lpparam.classLoader, "getString", String.class , int.class, new XC_MethodHook(){
 					@Override
 					protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+						//获取某字符串的调用堆栈 这里应该是字符串ID而不是可绘制的图像
 						if ((int)param.args[1] == res_msg_send_Id) {
 							// 获取调用堆栈信息
 							StringBuilder sb = new StringBuilder();
@@ -166,6 +174,20 @@ public class Leader implements IXposedHookLoadPackage,IXposedHookInitPackageReso
 							}
 							XposedBridge.log(sb.toString());
 						}
+					}
+				});
+		} else {
+			Class<?> sendMsgHelper = lpparam.classLoader.loadClass("org.telegram.messenger.SendMessagesHelper");
+			XposedBridge.hookAllMethods(sendMsgHelper, "sendMessage", new XC_MethodHook(){
+					@Override
+					protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+						Object[] args = param.args;
+						StringBuilder sb = new StringBuilder("SendMessages\nsend参数:").append(args.length).append('\n');
+						for (Object obj : args) {
+							sb.append(obj);
+							sb.append('\n');
+						}
+						XposedBridge.log(sb.toString());
 					}
 				});
 		}
