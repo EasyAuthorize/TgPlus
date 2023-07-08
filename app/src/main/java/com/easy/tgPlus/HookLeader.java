@@ -2,40 +2,55 @@ package com.easy.tgPlus;
 
 import android.app.Application;
 import android.content.Context;
-import com.easy.tgPlus.HookImpl.Repeater;
-import com.easy.tgPlus.HookImpl.UnlockCopySave;
-import de.robv.android.xposed.IXposedHookInitPackageResources;
+import com.easy.tgPlus.HookImpl.*;
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
-import de.robv.android.xposed.callbacks.XC_InitPackageResources;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
+import de.robv.android.xposed.IXposedHookInitPackageResources;
+import de.robv.android.xposed.callbacks.XC_InitPackageResources.InitPackageResourcesParam;
+import de.robv.android.xposed.callbacks.XC_InitPackageResources;
 
-public class HookLeader implements IXposedHookLoadPackage{
+public class HookLeader implements IXposedHookLoadPackage,IXposedHookInitPackageResources{
 
 	final ModuleConfigs modConf = ModuleConfigs.getInstance();
 
 	int testId = 0;
+	
+	@Override
+	public void handleInitPackageResources(XC_InitPackageResources.InitPackageResourcesParam resParam) throws Throwable{
+		String pkName = resParam.packageName;
+		if(modConf.isTargetPackage(pkName)){
+			
+			if(BuildConfig.DEBUG){
+				testId = resParam.res.getIdentifier("EditedMessage","string",pkName);
+				XposedBridge.log("正在检测字符串("+resParam.res.getString(testId)+")调用堆栈");
+			}
+		}
+	}
+
+	
 
 	@Override
 	public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable{
-		if(modConf.isTargetPackage||modConf.isThisPackage)return;
-		modConf.setLoadPackageParam(lpparam);
-		modConf.setRunPackage(lpparam.packageName);
-		if (modConf.isThisPackage){
+		String runPackageName = lpparam.packageName;
+		
+		if (modConf.isThisPackage(runPackageName)){
 			Class<?> mainActivity = lpparam.classLoader.loadClass("com.easy.tgPlus.MainActivity");
 			XposedHelpers.findAndHookMethod(mainActivity, "isActivate", XC_MethodReplacement.returnConstant(true));
 			//测试
 			return;
 		}
-		if (!modConf.isTargetPackage)return;
-
+		
+		if (!modConf.isTargetPackage(runPackageName))return;
+		modConf.setLoadPackageParam(lpparam);
+		modConf.setRunPackage(runPackageName);
 		//程序启动后获得上下文
 		//attachBaseContext
 		XposedHelpers.findAndHookMethod(Application.class, "attach", Context.class, new XC_MethodHook() {
@@ -49,12 +64,10 @@ public class HookLeader implements IXposedHookLoadPackage{
 				}
 			});
 
-
 		final boolean isWebPackage = lpparam.packageName.equals("org.telegram.messenger.web");
-
 		XposedBridge.log(isWebPackage ?"TG(Web)运行～": "TG运行～" + 
 			new SimpleDateFormat("yyyy年MM月dd日 a hh:mm:ss").format(System.currentTimeMillis()));
-		//语言包hook(暂时没有hook更改语言包)
+		//语言包hook
 		XposedHelpers.findAndHookConstructor("org.telegram.messenger.LocaleController", lpparam.classLoader, new XC_MethodHook(){
 				@Override
 				protected void afterHookedMethod(MethodHookParam param) throws Throwable{
@@ -74,18 +87,24 @@ public class HookLeader implements IXposedHookLoadPackage{
 		HookModule hm = new UnlockCopySave();
 		modConf.addHookModule(hm);
 		if (BuildConfig.DEBUG){
-			XposedBridge.log("模块:" + hm.TAG + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+			XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
 		}
 		hm = new Repeater();
 		modConf.addHookModule(hm);
 		if (BuildConfig.DEBUG){
-			XposedBridge.log("模块:" + hm.TAG + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+			XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+		}
+		hm = new AntiRetraction();
+		modConf.addHookModule(hm);
+		if (BuildConfig.DEBUG){
+			XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
 		}
 
 		//debug
 		if (BuildConfig.DEBUG){
 			//打印调用堆栈
-			XposedHelpers.findAndHookMethod("org.telegram.messenger.LocaleController", lpparam.classLoader, "formatString", String.class , int.class, Object[].class, new XC_MethodHook(){
+			if(true)return;
+			XposedHelpers.findAndHookMethod("org.telegram.messenger.LocaleController", lpparam.classLoader, "getString", String.class , int.class, new XC_MethodHook(){
 					@Override
 					protected void beforeHookedMethod(MethodHookParam param) throws Throwable{
 						//获取某字符串的调用堆栈
@@ -164,8 +183,8 @@ public class HookLeader implements IXposedHookLoadPackage{
 		return sb;
 	}
 
-	public static void logStringResHook(int id, String rawStr){
-		XposedBridge.log("资源id:" + Integer.toHexString(id) + "(\"" + rawStr + "\")hook成功～\n");
+	public static void log(HookModule hm){
+		XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
 	}
 
 }

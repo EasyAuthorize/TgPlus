@@ -37,6 +37,9 @@ public class ModuleConfigs{
 		"it.owlgram.android"
 	);
 
+	//放在这里会导致初始化过程该变量为空
+	//但是我也不想在get方法写判断，反正委屈一下开发者就行了
+	//等有空了移除掉单例模式，兼容一下多进程hook
 	private static ModuleConfigs INSTANCE = new ModuleConfigs();
 
 	Context con = null;//AndroidAppHelper.currentApplication();
@@ -44,13 +47,19 @@ public class ModuleConfigs{
 	SharedPreferences conf;
 
 	XC_LoadPackage.LoadPackageParam loadPackage;
-
-	boolean isThisPackage = false,isTargetPackage = false;
 	
 	HashMap<String,HookModule> modList = new  HashMap<String,HookModule>();
 
 	private ModuleConfigs(){
 		//单例
+	}
+
+	public boolean isThisPackage(String runPackageName){
+		return runPackageName.equals(thisPackage);
+	}
+
+	public boolean isTargetPackage(String runPackageName){
+		return hookPackages.contains(runPackageName);
 	}
 
 	public void setLoadPackageParam(XC_LoadPackage.LoadPackageParam lpparam){
@@ -67,13 +76,6 @@ public class ModuleConfigs{
 
 	public void setRunPackage(String packageName){
 		runPackage = packageName;
-
-		isThisPackage = thisPackage.equals(runPackage);
-		if (isThisPackage){
-			isTargetPackage = false;
-			return;
-		}
-		isTargetPackage = hookPackages.contains(runPackage);
 	}
 	
 	public String getRunPackage(){

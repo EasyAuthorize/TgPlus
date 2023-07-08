@@ -48,7 +48,6 @@ public class Repeater extends HookModule{
 					protected void beforeHookedMethod(MethodHookParam param){
 						if (!isSwitchOn()){return;}
 						Resources res = modConf.getContext().getResources();
-						XposedBridge.log(lpparam.packageName+" "+modConf.getRunPackage()+" "+modConf.getContext().getPackageName());
 						Object t = param.thisObject;
 						XposedBridge.log(t.toString());
 						final Object main = XposedHelpers.getObjectField(t, "this$0");
