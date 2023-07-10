@@ -20,6 +20,7 @@ import java.util.HashMap;
 import com.easy.tgPlus.HookLeader;
 import de.robv.android.xposed.callbacks.XC_InitPackageResources;
 import android.content.res.Resources;
+import java.lang.reflect.Method;
 
 public class Repeater extends HookModule{
 
@@ -84,6 +85,7 @@ public class Repeater extends HookModule{
 													XposedHelpers.getObjectField(main, "dialog_id"),
 													threadMessageObject, threadMessageObject, null, true, null, null, null, true, 0, null, false});
 											Toast.makeText(con, "复读机:" + content.toString() , Toast.LENGTH_SHORT).show();
+											
 										}catch (ClassNotFoundException e){
 											XposedBridge.log(e);
 										}
@@ -128,7 +130,20 @@ public class Repeater extends HookModule{
 											};
 											adBuilder.setTitle("MessageObject")
 												.setMessage(HookLeader.objDump(new StringBuilder(selectedObject.toString()).append('\n'), selectedObject, 0))
-												.setPositiveButton("确认", null)
+												.setPositiveButton("确认", new DialogInterface.OnClickListener(){
+													@Override
+													public void onClick(DialogInterface dialog, int which){
+														XposedHelpers.setBooleanField(selectedObject,"deleted",true);
+														try{
+															Class<?> chatMsgCell = lpparam.classLoader.loadClass("org.telegram.ui.Cells.ChatMessageCell");
+															Method wantMethod = chatMsgCell.getDeclaredMethod("measureTime", lpparam.classLoader.loadClass("org.telegram.messenger.MessageObject"));
+															wantMethod.setAccessible(true);
+															wantMethod.invoke(null,selectedObject);
+															//XposedHelpers.callStaticMethod(chatMsgCell,"measureTime",selectedObject);
+														}catch (Exception e){}
+														
+													}
+												})
 												.setNegativeButton("复制", new DialogInterface.OnClickListener(){
 													@Override
 													public void onClick(DialogInterface dialog, int which){

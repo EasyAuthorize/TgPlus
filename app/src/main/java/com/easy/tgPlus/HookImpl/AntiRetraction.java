@@ -12,6 +12,9 @@ import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XC_MethodHook.MethodHookParam;
 import android.text.SpannableStringBuilder;
 import android.text.TextPaint;
+import com.easy.tgPlus.HookLeader;
+import java.util.Iterator;
+import java.util.ListIterator;
 
 public class AntiRetraction extends HookModule{
 
@@ -26,43 +29,63 @@ public class AntiRetraction extends HookModule{
 		super(ModuleId, ModuleName, ModuleDoc);
 	}
 
-	//Lorg/telegram/messenger/MessagesStorage;->updateDialogsWithDeletedMessages(JJLjava/util/ArrayList;Ljava/util/ArrayList;Z)V
-	//updateDialogsWithDeletedMessages(long j, long j2, ArrayList<Integer> arrayList, ArrayList<Long> arrayList2, boolean z)
+	//如果需要这个功能可以拿走哦，源代码中需保留作者信息
+	//getMessagesStorage().deletePushMessages(j2, arrayList);
+	//getMessagesStorage().updateDialogsWithDeletedMessages(j2,
+	//j,
+	//arrayList,
+	//getMessagesStorage().markMessagesAsDeleted(j2, arrayList, false, true, false),
+	//false);
 
 	@Override
 	protected boolean init(){
 		try{
 			final ModuleConfigs modConf = ModuleConfigs.getInstance();
 			final XC_LoadPackage.LoadPackageParam lpparam = modConf.getLoadPackageParam();
-			//这个没啥用
-			//deleteMessages(ArrayList<Integer> arrayList, ArrayList<Long> arrayList2, TLRPC.EncryptedChat encryptedChat, long j, boolean z, boolean z2, boolean z3, long j2, TLObject tLObject) {}
-			Class<?> zlass = lpparam.classLoader.loadClass("org.telegram.messenger.MessagesStorage");
-			Method wantMethod = zlass.getMethod("updateDialogsWithDeletedMessages", long.class, long.class, ArrayList.class, ArrayList.class, boolean.class);
+			//阻止UI执行删除
+			Class<?> zlass = lpparam.classLoader.loadClass("org.telegram.messenger.MessagesController");
+			Method wantMethod = zlass.getDeclaredMethod("processUpdateArray",ArrayList.class, ArrayList.class, ArrayList.class, Boolean.TYPE, Integer.TYPE);
 			XposedBridge.hookMethod(wantMethod, new XC_MethodReplacement(){
 					@Override
 					protected Object replaceHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable{
 						if (isSwitchOn()){
-							beforeHookedMethod2(param);
-							return null;
+							return beforeHookedMethod2(param);
 						}
 						return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
 					}
-
+					
+					Class<?> a = lpparam.classLoader.loadClass("org.telegram.tgnet.TLRPC$TL_updateDeleteMessages");
+					Class<?> b = lpparam.classLoader.loadClass("org.telegram.tgnet.TLRPC$TL_updateDeleteChannelMessages");
 					//@Override
-					public void beforeHookedMethod2(MethodHookParam param){
-						//开发中
-						long dialogId = param.args[0];
-						long channelId = param.args[1];
-						ArrayList<Integer> messages = (ArrayList<Integer>) param.args[2];
-						ArrayList<Long> additionalDialogsToUpdate = (ArrayList<Long>) param.args[3];
-						if (messages == null || messages.size() == 0)return;
-						Object msg = messages.get(0);
-						XposedBridge.log(String.format("删除消息:从对话(%d)中,通知ID(%d),messages.length=%d,第一条消息ID:%s", dialogId, channelId, messages.size(), msg.toString()));
-						//param.setThrowable(new Throwable("方法updateDialogsWithDeletedMessages已终止"));
+					public Object beforeHookedMethod2(MethodHookParam param) throws Throwable{
+						
+						ListIterator it = ((ArrayList) param.args[0]).listIterator();
+						while (it.hasNext()) {
+							Object next = it.next();
+							if (a.isInstance(next) || b.isInstance(next)) {
+								it.remove();
+							}
+						}
+						return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
 					}
 				});
+			zlass = lpparam.classLoader.loadClass("org.telegram.messenger.NotificationCenter");
+			final Class m = zlass;
+			XposedBridge.hookAllMethods(zlass, "postNotificationName", new XC_MethodReplacement(){
+
+					@Override
+					protected Object replaceHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable{
+						if(param.args[0] == XposedHelpers.getStaticIntField(m,"messagesDeleted"))
+						return null;
+						return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
+					}
+					
+				
+			});
+
 			//这个会阻止所有人删除本地消息
 			//包括自己的消息（重启还原）
+			zlass = lpparam.classLoader.loadClass("org.telegram.messenger.MessagesStorage");
 			wantMethod = zlass.getMethod("markMessagesAsDeleted", long.class, ArrayList.class, boolean.class, boolean.class, boolean.class);
 			XposedBridge.hookMethod(wantMethod, new XC_MethodReplacement(){
 					@Override
