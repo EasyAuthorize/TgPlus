@@ -76,6 +76,7 @@ public class HookLeader implements IXposedHookLoadPackage,IXposedHookInitPackage
 					HashMap<String,String> mlocaleValues = (HashMap<String,String>)XposedHelpers.getObjectField(mLocaleController, "localeValues");
 					String rawStr = mlocaleValues.get("Delete");
 					//这代表删除并非删除(防撤回)
+					//createDeleteMessagesAlert(selectedObject, selectedObjectGroup, 1,true);
 					mlocaleValues.put("Delete", "(" + rawStr + ")");
 					if (isWebPackage){
 						mlocaleValues.put("AppName", "Telegram(Web)");

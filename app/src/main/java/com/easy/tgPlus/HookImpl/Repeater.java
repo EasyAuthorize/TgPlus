@@ -4,10 +4,12 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.res.Resources;
 import android.text.SpannableStringBuilder;
 import android.view.View;
 import android.widget.Toast;
 import com.easy.tgPlus.BuildConfig;
+import com.easy.tgPlus.HookLeader;
 import com.easy.tgPlus.HookModule;
 import com.easy.tgPlus.ModuleConfigs;
 import de.robv.android.xposed.XC_MethodHook;
@@ -17,10 +19,6 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
-import com.easy.tgPlus.HookLeader;
-import de.robv.android.xposed.callbacks.XC_InitPackageResources;
-import android.content.res.Resources;
-import java.lang.reflect.Method;
 
 public class Repeater extends HookModule{
 
@@ -49,7 +47,7 @@ public class Repeater extends HookModule{
 					protected void beforeHookedMethod(MethodHookParam param){
 						if (!isSwitchOn()){return;}
 						Resources res = modConf.getContext().getResources();
-						Object t = param.thisObject;
+						final Object t = param.thisObject;
 						XposedBridge.log(t.toString());
 						final Object main = XposedHelpers.getObjectField(t, "this$0");
 						final Context con = (Context)XposedHelpers.callMethod(main, "getParentActivity");
@@ -85,7 +83,7 @@ public class Repeater extends HookModule{
 													XposedHelpers.getObjectField(main, "dialog_id"),
 													threadMessageObject, threadMessageObject, null, true, null, null, null, true, 0, null, false});
 											Toast.makeText(con, "复读机:" + content.toString() , Toast.LENGTH_SHORT).show();
-											
+
 										}catch (ClassNotFoundException e){
 											XposedBridge.log(e);
 										}
@@ -133,15 +131,88 @@ public class Repeater extends HookModule{
 												.setPositiveButton("确认", new DialogInterface.OnClickListener(){
 													@Override
 													public void onClick(DialogInterface dialog, int which){
-														XposedHelpers.setBooleanField(selectedObject,"deleted",true);
+														XposedHelpers.setBooleanField(selectedObject, "deleted", true);
 														try{
+															Object chatListView = XposedHelpers.getObjectField(main, "chatListView");
+															Object chatAdapter = XposedHelpers.getObjectField(main, "chatAdapter");
+															ArrayList msgs;
+															if (XposedHelpers.getBooleanField(chatAdapter, "isFrozen")){
+																msgs = (ArrayList)XposedHelpers.getObjectField(chatAdapter, "frozenMessages");
+															}else{
+																msgs = (ArrayList)XposedHelpers.getObjectField(main, "messages");
+															}
+															int index = msgs.indexOf(selectedObject);
+															if (index == -1){
+																XposedBridge.log("找不到对象");
+															}else{
+																View cell = (View) XposedHelpers.callMethod(XposedHelpers.callMethod(chatListView,"getLayoutManager"),"findViewByPosition",new Class<?>[]{int.class},new Object[]{index});
+																if(cell == null){
+																	XposedBridge.log("View cell查找失败");
+																	return;
+																}
+																XposedHelpers.callMethod(cell,"setMessageContent",new Class<?>[]{
+																	selectedObject.getClass(),
+																	lpparam.classLoader.loadClass("org.telegram.messenger.MessageObject$GroupedMessages"),
+																	boolean.class,
+																	boolean.class
+																},new Object[]{
+																	selectedObject,
+																	XposedHelpers.getObjectField(cell,"groupedMessagesToSet"),
+																	false,
+																	false
+																});
+															}
+															
+															/*
 															Class<?> chatMsgCell = lpparam.classLoader.loadClass("org.telegram.ui.Cells.ChatMessageCell");
-															Method wantMethod = chatMsgCell.getDeclaredMethod("measureTime", lpparam.classLoader.loadClass("org.telegram.messenger.MessageObject"));
-															wantMethod.setAccessible(true);
-															wantMethod.invoke(null,selectedObject);
-															//XposedHelpers.callStaticMethod(chatMsgCell,"measureTime",selectedObject);
+															XposedHelpers.callStaticMethod(chatMsgCell,"measureTime",selectedObject);
+															Object chatAdapter = XposedHelpers.getObjectField(main, "chatAdapter");
+															ArrayList msgs;
+															if (XposedHelpers.getBooleanField(chatAdapter, "isFrozen")){
+																msgs = (ArrayList)XposedHelpers.getObjectField(chatAdapter, "frozenMessages");
+															}else{
+																msgs = (ArrayList)XposedHelpers.getObjectField(main, "messages");
+															}
+															int i = msgs.indexOf(selectedObject);
+															if (i == -1){
+																XposedBridge.log("找不到对象");
+															}else{
+																XposedHelpers.callMethod(chatAdapter, "notifyItemChanged", new Class[]{int.class}, new Object[]{i});
+															}
+															*/
+															//XposedHelpers.callMethod(XposedHelpers.getObjectField(main,"chatAdapter"),"updateRowWithMessageObject",new Class<?>[]{selectedObject.getClass(),boolean.class},new Object[]{selectedObject,false});
+															//XposedHelpers.callMethod(XposedHelpers.getObjectField(main,"chatAdapter"),"notifyDataSetChanged",new Class[]{boolean.class},new Object[]{false});
+															/*
+															 Class<?> chatMsgCell = lpparam.classLoader.loadClass("org.telegram.ui.Cells.ChatMessageCell");
+															 XposedHelpers.callStaticMethod(chatMsgCell,"measureTime",selectedObject);
+															 */
+															/*
+															 Class<?> messagesController = lpparam.classLoader.loadClass("org.telegram.messenger.MessagesController");
+															 Method loadMessages = messagesController.getClass().getDeclaredMethod("loadMessages",
+															 long.class, long.class, boolean.class, int.class, int.class,
+															 int.class, boolean.class, int.class, int.class, int.class,
+															 int.class, int.class, int.class, int.class, int.class);
+															 // loadMessages(dialog_id, mergeDialogId, false, 30, 0, date, true, 0, classGuid, 4, 0, chatMode, threadMessageId, replyMaxReadId, lastLoadIndex++);
+															 long dialogId = XposedHelpers.getLongField(main, "dialog_id");
+															 long mergeDialogId = XposedHelpers.getLongField(main, "mergeDialogId");
+															 int date = Math.toIntExact(System.currentTimeMillis() / 1000L);
+															 int classGuid = XposedHelpers.getIntField(main, "classGuid");
+															 int chatMode = XposedHelpers.getIntField(main, "chatMode");
+															 int threadMessageId = XposedHelpers.getIntField(main, "threadMessageId");
+															 int replyMaxReadId = XposedHelpers.getIntField(main, "replyMaxReadId");
+															 int lastLoadIndex = XposedHelpers.getIntField(main, "lastLoadIndex");
+															 loadMessages.invoke(messagesController, dialogId, mergeDialogId, false, 30, 0, date, true, 0, classGuid, 4, 0, chatMode, threadMessageId, replyMaxReadId, lastLoadIndex);
+															 */
+															/*
+															 Object MessagesController = XposedHelpers.callMethod(main,"getMessagesController");
+															 XposedHelpers.callMethod(MessagesController,"updateInterfaceWithMessages",new Class<?>[]{long.class,ArrayList.class,boolean.class},new Object[]{0,Arrays.asList(selectedObject),false});
+															 Class<?> chatMsgCell = lpparam.classLoader.loadClass("org.telegram.messenger.NotificationCenter");
+															 Method wantMethod = chatMsgCell.getDeclaredMethod("postNotificationName", int.class);
+															 wantMethod.setAccessible(true);
+															 wantMethod.invoke(null,XposedHelpers.getStaticIntField(chatMsgCell,"dialogsNeedReload"));
+															 */
 														}catch (Exception e){}
-														
+
 													}
 												})
 												.setNegativeButton("复制", new DialogInterface.OnClickListener(){
