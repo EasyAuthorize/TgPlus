@@ -214,8 +214,8 @@ public class AntiRetraction extends HookModule{
 					protected void afterHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable{
 						Object msg = param.args[0];
 						//deleted变量对消息影响太大
-						boolean isdel = XposedHelpers.getBooleanField(msg,"deleted");
-						if(isdel == true){
+						String isdel = (String) XposedHelpers.getObjectField(msg,"sponsoredInfo");
+						if(isdel != null){
 							XposedBridge.log("删除文本绘制成功");
 							Object thisMsgCell = param.thisObject;
 							String currentTimeString = XposedHelpers.getObjectField(thisMsgCell,"currentTimeString").toString();

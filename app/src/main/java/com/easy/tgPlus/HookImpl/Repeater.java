@@ -131,7 +131,7 @@ public class Repeater extends HookModule{
 												.setPositiveButton("确认", new DialogInterface.OnClickListener(){
 													@Override
 													public void onClick(DialogInterface dialog, int which){
-														XposedHelpers.setBooleanField(selectedObject, "deleted", true);
+														XposedHelpers.setObjectField(selectedObject, "sponsoredInfo", "已删除的消息");
 														try{
 															Object chatListView = XposedHelpers.getObjectField(main, "chatListView");
 															Object chatAdapter = XposedHelpers.getObjectField(main, "chatAdapter");
@@ -164,6 +164,8 @@ public class Repeater extends HookModule{
 															}
 															
 															/*
+															//无法刷新时间标签
+															//需要靠view复用重新绑定数据
 															Class<?> chatMsgCell = lpparam.classLoader.loadClass("org.telegram.ui.Cells.ChatMessageCell");
 															XposedHelpers.callStaticMethod(chatMsgCell,"measureTime",selectedObject);
 															Object chatAdapter = XposedHelpers.getObjectField(main, "chatAdapter");
@@ -180,6 +182,7 @@ public class Repeater extends HookModule{
 																XposedHelpers.callMethod(chatAdapter, "notifyItemChanged", new Class[]{int.class}, new Object[]{i});
 															}
 															*/
+															//历史代码懒得测
 															//XposedHelpers.callMethod(XposedHelpers.getObjectField(main,"chatAdapter"),"updateRowWithMessageObject",new Class<?>[]{selectedObject.getClass(),boolean.class},new Object[]{selectedObject,false});
 															//XposedHelpers.callMethod(XposedHelpers.getObjectField(main,"chatAdapter"),"notifyDataSetChanged",new Class[]{boolean.class},new Object[]{false});
 															/*
