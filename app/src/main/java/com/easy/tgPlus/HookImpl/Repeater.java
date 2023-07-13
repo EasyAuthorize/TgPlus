@@ -19,6 +19,8 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.lang.reflect.Method;
+import java.util.Arrays;
 
 public class Repeater extends HookModule{
 
@@ -131,90 +133,56 @@ public class Repeater extends HookModule{
 												.setPositiveButton("确认", new DialogInterface.OnClickListener(){
 													@Override
 													public void onClick(DialogInterface dialog, int which){
-														XposedHelpers.setObjectField(selectedObject, "sponsoredInfo", "已删除的消息");
+														Object msg = XposedHelpers.getObjectField(selectedObject,"messageOwner");
+														//XposedHelpers.setBooleanField(msg, "edit_hide", false);
+														XposedHelpers.setIntField(msg, "flags", XposedHelpers.getIntField(msg,"flags") | 0x10000000);
+														Class<?> AndroidUtil;
 														try{
-															Object chatListView = XposedHelpers.getObjectField(main, "chatListView");
-															Object chatAdapter = XposedHelpers.getObjectField(main, "chatAdapter");
-															ArrayList msgs;
-															if (XposedHelpers.getBooleanField(chatAdapter, "isFrozen")){
-																msgs = (ArrayList)XposedHelpers.getObjectField(chatAdapter, "frozenMessages");
-															}else{
-																msgs = (ArrayList)XposedHelpers.getObjectField(main, "messages");
+															AndroidUtil = lpparam.classLoader.loadClass("org.telegram.messenger.AndroidUtilities");
+														}catch (ClassNotFoundException e){e.printStackTrace();return;}
+														XposedHelpers.callStaticMethod(AndroidUtil, "runOnUIThread", new Class[]{Runnable.class}, new Object[]{
+																new Runnable(){
+																	@Override
+																	public void run(){
+																		try{
+																			Object chatListView = XposedHelpers.getObjectField(main, "chatListView");
+																			Object chatAdapter = XposedHelpers.getObjectField(main, "chatAdapter");
+																			ArrayList msgs;
+																			if (XposedHelpers.getBooleanField(chatAdapter, "isFrozen")){
+																				msgs = (ArrayList)XposedHelpers.getObjectField(chatAdapter, "frozenMessages");
+																			}else{
+																				msgs = (ArrayList)XposedHelpers.getObjectField(main, "messages");
+																			}
+																			int index = msgs.indexOf(selectedObject);
+																			if (index == -1){
+																				XposedBridge.log("找不到对象");
+																			}else{
+																				View cell = (View) XposedHelpers.callMethod(XposedHelpers.callMethod(chatListView,"getLayoutManager"),"findViewByPosition",new Class<?>[]{int.class},new Object[]{index});
+																				if(cell == null){
+																					XposedBridge.log("View cell查找失败");
+																					return;
+																				}
+																				//XposedHelpers.callMethod(cell,"measureTime",selectedObject);
+																				//XposedHelpers.callMethod(XposedHelpers.getObjectField(main,"chatAdapter"),"notifyDataSetChanged",new Class[]{boolean.class},new Object[]{false});
+																				//这行是最初的刷新，带动画，没有函数比他更好用，经常刷不动
+																				XposedHelpers.callMethod(XposedHelpers.getObjectField(main,"chatAdapter"),"updateRowWithMessageObject",new Class<?>[]{selectedObject.getClass(),boolean.class},new Object[]{selectedObject,false});
+																				XposedHelpers.callMethod(cell,"setMessageContent",new Class<?>[]{
+																						selectedObject.getClass(),
+																						lpparam.classLoader.loadClass("org.telegram.messenger.MessageObject$GroupedMessages"),
+																						boolean.class,
+																						boolean.class
+																					},new Object[]{
+																						selectedObject,
+																						XposedHelpers.getObjectField(cell,"groupedMessagesToSet"),
+																						false,
+																						false
+																					});
+																				XposedHelpers.callMethod(chatAdapter, "notifyItemChanged", new Class[]{int.class}, new Object[]{index});
+																			}
+																		}catch(Exception e){e.printStackTrace();}
+																	}
 															}
-															int index = msgs.indexOf(selectedObject);
-															if (index == -1){
-																XposedBridge.log("找不到对象");
-															}else{
-																View cell = (View) XposedHelpers.callMethod(XposedHelpers.callMethod(chatListView,"getLayoutManager"),"findViewByPosition",new Class<?>[]{int.class},new Object[]{index});
-																if(cell == null){
-																	XposedBridge.log("View cell查找失败");
-																	return;
-																}
-																XposedHelpers.callMethod(cell,"setMessageContent",new Class<?>[]{
-																	selectedObject.getClass(),
-																	lpparam.classLoader.loadClass("org.telegram.messenger.MessageObject$GroupedMessages"),
-																	boolean.class,
-																	boolean.class
-																},new Object[]{
-																	selectedObject,
-																	XposedHelpers.getObjectField(cell,"groupedMessagesToSet"),
-																	false,
-																	false
-																});
-															}
-															
-															/*
-															//无法刷新时间标签
-															//需要靠view复用重新绑定数据
-															Class<?> chatMsgCell = lpparam.classLoader.loadClass("org.telegram.ui.Cells.ChatMessageCell");
-															XposedHelpers.callStaticMethod(chatMsgCell,"measureTime",selectedObject);
-															Object chatAdapter = XposedHelpers.getObjectField(main, "chatAdapter");
-															ArrayList msgs;
-															if (XposedHelpers.getBooleanField(chatAdapter, "isFrozen")){
-																msgs = (ArrayList)XposedHelpers.getObjectField(chatAdapter, "frozenMessages");
-															}else{
-																msgs = (ArrayList)XposedHelpers.getObjectField(main, "messages");
-															}
-															int i = msgs.indexOf(selectedObject);
-															if (i == -1){
-																XposedBridge.log("找不到对象");
-															}else{
-																XposedHelpers.callMethod(chatAdapter, "notifyItemChanged", new Class[]{int.class}, new Object[]{i});
-															}
-															*/
-															//历史代码懒得测
-															//XposedHelpers.callMethod(XposedHelpers.getObjectField(main,"chatAdapter"),"updateRowWithMessageObject",new Class<?>[]{selectedObject.getClass(),boolean.class},new Object[]{selectedObject,false});
-															//XposedHelpers.callMethod(XposedHelpers.getObjectField(main,"chatAdapter"),"notifyDataSetChanged",new Class[]{boolean.class},new Object[]{false});
-															/*
-															 Class<?> chatMsgCell = lpparam.classLoader.loadClass("org.telegram.ui.Cells.ChatMessageCell");
-															 XposedHelpers.callStaticMethod(chatMsgCell,"measureTime",selectedObject);
-															 */
-															/*
-															 Class<?> messagesController = lpparam.classLoader.loadClass("org.telegram.messenger.MessagesController");
-															 Method loadMessages = messagesController.getClass().getDeclaredMethod("loadMessages",
-															 long.class, long.class, boolean.class, int.class, int.class,
-															 int.class, boolean.class, int.class, int.class, int.class,
-															 int.class, int.class, int.class, int.class, int.class);
-															 // loadMessages(dialog_id, mergeDialogId, false, 30, 0, date, true, 0, classGuid, 4, 0, chatMode, threadMessageId, replyMaxReadId, lastLoadIndex++);
-															 long dialogId = XposedHelpers.getLongField(main, "dialog_id");
-															 long mergeDialogId = XposedHelpers.getLongField(main, "mergeDialogId");
-															 int date = Math.toIntExact(System.currentTimeMillis() / 1000L);
-															 int classGuid = XposedHelpers.getIntField(main, "classGuid");
-															 int chatMode = XposedHelpers.getIntField(main, "chatMode");
-															 int threadMessageId = XposedHelpers.getIntField(main, "threadMessageId");
-															 int replyMaxReadId = XposedHelpers.getIntField(main, "replyMaxReadId");
-															 int lastLoadIndex = XposedHelpers.getIntField(main, "lastLoadIndex");
-															 loadMessages.invoke(messagesController, dialogId, mergeDialogId, false, 30, 0, date, true, 0, classGuid, 4, 0, chatMode, threadMessageId, replyMaxReadId, lastLoadIndex);
-															 */
-															/*
-															 Object MessagesController = XposedHelpers.callMethod(main,"getMessagesController");
-															 XposedHelpers.callMethod(MessagesController,"updateInterfaceWithMessages",new Class<?>[]{long.class,ArrayList.class,boolean.class},new Object[]{0,Arrays.asList(selectedObject),false});
-															 Class<?> chatMsgCell = lpparam.classLoader.loadClass("org.telegram.messenger.NotificationCenter");
-															 Method wantMethod = chatMsgCell.getDeclaredMethod("postNotificationName", int.class);
-															 wantMethod.setAccessible(true);
-															 wantMethod.invoke(null,XposedHelpers.getStaticIntField(chatMsgCell,"dialogsNeedReload"));
-															 */
-														}catch (Exception e){}
+														});
 
 													}
 												})
@@ -230,7 +198,15 @@ public class Repeater extends HookModule{
 												.setNeutralButton("隐藏final", new DialogInterface.OnClickListener(){
 													@Override
 													public void onClick(DialogInterface dialog, int which){
-														adBuilder.setNeutralButton(null, null);
+														adBuilder.setNeutralButton("显示messageOwner", new DialogInterface.OnClickListener(){
+																@Override
+																public void onClick(DialogInterface p1, int p2){
+																	adBuilder.setNeutralButton(null,null);
+																	Object msg = XposedHelpers.getObjectField(selectedObject,"messageOwner");
+																	adBuilder.setMessage(HookLeader.objDump(new StringBuilder(msg.toString()).append('\n'), msg, 0));
+																	adBuilder.show();
+																}
+														});
 														adBuilder.setMessage(HookLeader.objDump(new StringBuilder(selectedObject.toString()).append('\n'), selectedObject, Modifier.FINAL));
 														adBuilder.show();
 													}

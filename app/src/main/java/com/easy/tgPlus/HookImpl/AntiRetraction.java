@@ -18,6 +18,11 @@ import java.util.ListIterator;
 import java.util.HashMap;
 import java.util.AbstractMap;
 import android.util.LongSparseArray;
+import android.util.SparseArray;
+import android.widget.Toast;
+import java.util.Arrays;
+import de.robv.android.xposed.BuildConfig;
+import android.text.TextUtils;
 
 public class AntiRetraction extends HookModule{
 
@@ -31,6 +36,9 @@ public class AntiRetraction extends HookModule{
 	public AntiRetraction(){
 		super(ModuleId, ModuleName, ModuleDoc);
 	}
+	
+	//当前版本最高flag28位
+	public static final int FLAG_DELETED = 1 << 28;
 
 	//如果需要这个功能可以拿走哦，源代码中需保留作者信息
 	//getMessagesStorage().deletePushMessages(j2, arrayList);
@@ -39,6 +47,14 @@ public class AntiRetraction extends HookModule{
 	//arrayList,
 	//getMessagesStorage().markMessagesAsDeleted(j2, arrayList, false, true, false),
 	//false);
+	
+	//TL_messages_deleteMessages.readParams(AbstractSerializedData stream, boolean exception)
+	
+	//updateWidgets(dialogsIds);
+	//dialogsToUpdate.get(did);
+	
+	//这个好像是插入消息用的
+	//XposedHelpers.callMethod(param.thisObject,"updateInterfaceWithMessages",new Class<?>[]{long.class,ArrayList.class,boolean.class},new Object[]{dialogId,objs,false})
 	
 	public void markMethodZero(Class<?> zlass,String methodName){
 		XposedBridge.hookAllMethods(zlass, methodName, new XC_MethodReplacement(){
@@ -62,7 +78,7 @@ public class AntiRetraction extends HookModule{
 			//int date)
 			Class<?> zlass = lpparam.classLoader.loadClass("org.telegram.messenger.MessagesController");
 			Method wantMethod = zlass.getDeclaredMethod("processUpdateArray",ArrayList.class, ArrayList.class, ArrayList.class, Boolean.TYPE, Integer.TYPE);
-			/*
+			
 			XposedBridge.hookMethod(wantMethod, new XC_MethodReplacement(){
 					@Override
 					protected Object replaceHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable{
@@ -72,49 +88,106 @@ public class AntiRetraction extends HookModule{
 						return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
 					}
 					
-					Class<?> a = lpparam.classLoader.loadClass("org.telegram.tgnet.TLRPC$TL_updateDeleteMessages");
-					Class<?> b = lpparam.classLoader.loadClass("org.telegram.tgnet.TLRPC$TL_updateDeleteChannelMessages");
+					Class<?> udm = lpparam.classLoader.loadClass("org.telegram.tgnet.TLRPC$TL_updateDeleteMessages");
+					Class<?> udcm = lpparam.classLoader.loadClass("org.telegram.tgnet.TLRPC$TL_updateDeleteChannelMessages");
 					//@Override
-					public Object beforeHookedMethod2(MethodHookParam param) throws Throwable{
-						
+					public Object beforeHookedMethod2(final MethodHookParam param) throws Throwable{
 						ListIterator it = ((ArrayList) param.args[0]).listIterator();
+						long dialogId;
 						while (it.hasNext()) {
 							Object next = it.next();
-							if (a.isInstance(next) || b.isInstance(next)) {
+							if (udm.isInstance(next)) {
+								//dialogId=0为私聊则需要查UID
+								dialogId = 0;
+								//mid ids
+								ArrayList<Integer> delMsg = (ArrayList<Integer>) XposedHelpers.getObjectField(next,"messages");
+								SparseArray<Object> msgs = (SparseArray<Object>) XposedHelpers.getObjectField(param.thisObject,"dialogMessagesByIds");
+								for(int id : delMsg){
+									//Object msgObj = XposedHelpers.callMethod(msgs,"get",new Class<?>[]{int.class},new Object[]{id});
+									Object msgObj = msgs.get(id);
+									if(msgObj == null){
+										//这里如果查找不到说明这条消息不是正在显示(猜的
+										XposedBridge.log("udm :delMsg size = "+delMsg.size()+" find msgObj = null");
+										break;
+									}									
+									Object mes = XposedHelpers.getObjectField(msgObj,"messageOwner");
+									XposedHelpers.setIntField(mes,"flags", XposedHelpers.getIntField(mes,"flags") | FLAG_DELETED);
+								}
+								Object db = XposedHelpers.callMethod(XposedHelpers.callMethod(param.thisObject,"getMessagesStorage"),"getDatabase");
+								
 								it.remove();
+								XposedBridge.log("udm :delMsg size = "+delMsg.size());
+							}else if(udcm.isInstance(next)){
+								dialogId = -XposedHelpers.getLongField(next,"channel_id");
+								ArrayList<Integer> delMsg = (ArrayList<Integer>) XposedHelpers.getObjectField(next,"messages");
+								//LongSparseArray<ArrayList<Object>> 
+								Object laMsgs = XposedHelpers.getObjectField(param.thisObject,"dialogMessage");
+								ArrayList<Object> objs = (ArrayList<Object>) XposedHelpers.callMethod(laMsgs,"get",new Class<?>[]{int.class},new Object[]{dialogId});
+								for(final Object msgObj : objs){
+									if(delMsg.contains(XposedHelpers.callMethod(msgObj,"getId"))){
+										Object mes = XposedHelpers.getObjectField(msgObj,"messageOwner");
+										XposedHelpers.setIntField(mes,"flags", XposedHelpers.getIntField(mes,"flags") | FLAG_DELETED);
+										XposedHelpers.callStaticMethod(lpparam.classLoader.loadClass("org.telegram.messenger.AndroidUtilities"), "runOnUIThread", new Class[]{Runnable.class}, new Object[]{
+												new Runnable(){
+													@Override
+													public void run(){
+														try{
+															CharSequence content = (CharSequence) XposedHelpers.getObjectField(msgObj,"messageText");
+															Toast.makeText(modConf.getContext(),"防撤回:"+content,Toast.LENGTH_SHORT).show();
+														}catch (Exception e){}
+													}
+												}
+											});
+									}
+								}
+								Object db = XposedHelpers.callMethod(XposedHelpers.callMethod(param.thisObject,"getMessagesStorage"),"getDatabase");
+								String update = "SELECT data "+
+												"FROM messages_v2 "+
+												"WHERE uid = "+dialogId+" AND mid IN ("+TextUtils.join(",",delMsg)+");";
+								Object cursor = XposedHelpers.callMethod(db,"queryFinalized",new Class<?>[]{String.class,Object[].class},new Object[]{update,new Object[]{}});
+								
+								while((boolean)XposedHelpers.callMethod(cursor,"next")){
+									//查询原始data
+									//好像可以从已有的Message对象调用序列化方法直接构造，懒得搞
+									Object data = XposedHelpers.callMethod(cursor,"byteBufferValue",new Class<?>[]{int.class},new Object[]{0});
+									
+									XposedHelpers.callMethod(data,"position",new Class<?>[]{int.class},new Object[]{4});
+									int flags = XposedHelpers.callMethod(data,"readInt32",new Class<?>[]{boolean.class},new Object[]{true});
+									flags |= FLAG_DELETED;
+									XposedHelpers.callMethod(data,"position",new Class<?>[]{int.class},new Object[]{4});
+									XposedHelpers.callMethod(data,"writeInt32",new Class<?>[]{int.class},new Object[]{flags});
+									XposedHelpers.callMethod(data,"position",new Class<?>[]{int.class},new Object[]{0});
+									//写入数据库
+									XposedBridge.log("flags = "+flags);
+									XposedHelpers.callMethod(data,"reuse");
+								}
+								XposedHelpers.callMethod(cursor,"dispose");
+								XposedBridge.log("SQL执行完毕");
+								it.remove();
+								XposedBridge.log("udcm :did | channel_id = "+ dialogId + "delMsg size = "+delMsg.size());
 							}
 						}
-						return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
-					}
-				});
-			*/
-			zlass = lpparam.classLoader.loadClass("org.telegram.messenger.NotificationCenter");
-			final Class m = zlass;
-			XposedBridge.hookAllMethods(zlass, "postNotificationName", new XC_MethodReplacement(){
-
-					@Override
-					protected Object replaceHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable{
-						if(param.args[0] == XposedHelpers.getStaticIntField(m,"messagesDeleted"))
-						return null;
+						XposedHelpers.callStaticMethod(lpparam.classLoader.loadClass("org.telegram.messenger.AndroidUtilities"), "runOnUIThread", new Class[]{Runnable.class}, new Object[]{
+								new Runnable(){
+									@Override
+									public void run(){
+										
+									}
+								}
+							});
 						return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
 					}
 					
-				
-			});
-			
-			zlass = lpparam.classLoader.loadClass("org.telegram.messenger.NotificationsController");
-			markMethodZero(zlass,"removeDeletedMessagesFromNotifications");
+					public void markMessagesDeleted(int dialogId,ArrayList<Integer> delMsg){
+						
+					}
+					
+				});
 			
 			zlass = lpparam.classLoader.loadClass("org.telegram.messenger.MessagesStorage");
-			markMethodZero(zlass,"deleteMessagesByPush");
 			/*
-			markMethodZero(zlass,"markMessagesAsDeletedByRandoms");
 			markMethodZero(zlass,"markMessagesAsDeleted");
 			markMethodZero(zlass,"updateDialogsWithDeletedMessages");
-			markMethodZero(zlass,"deleteMessages");
-			markMethodZero(zlass,"lambda$processUpdateArray$351");
-			markMethodZero(zlass,"lambda$deleteMessagesRange$377");
-			markMethodZero(zlass,"lambda$deleteMessagesByPush$316");
 			*/
 			//这个会阻止所有人删除本地消息
 			//包括自己的消息（重新进入还原）
@@ -145,85 +218,29 @@ public class AntiRetraction extends HookModule{
 					}
 				});
 				*/
-			//lpparam.classLoader.loadClass("com.easy.tgPlus.HookImpl.AntiRetraction$MessageObject");
-			/*
-			XposedHelpers.findAndHookConstructor(lpparam.classLoader.loadClass("org.telegram.messenger.MessageObject"),new Class<?>[]{
-				int.class,
-				lpparam.classLoader.loadClass("org.telegram.tgnet.TLRPC$TL_channelAdminLogEvent"),
-				ArrayList.class,
-				HashMap.class,
-				lpparam.classLoader.loadClass("org.telegram.tgnet.TLRPC$Chat"),
-				int[].class,
-				boolean.class
-			}, new XC_MethodReplacement(){
-
-					@Override
-					protected Object replaceHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable{
-						Object[] args = param.args;
-						int accountNum = args[0];
-						Object event = args[1];
-						ArrayList messageObjects = (ArrayList)args[2];
-						HashMap messagesByDays = (HashMap)args[3];
-						Object chat = args[4];
-						int[] mid = (int[])args[5];
-						boolean addToEnd = args[6];
-						return new MessageObject(accountNum,event,messageObjects,messagesByDays,chat,mid,addToEnd);
-					}
-				});
-			*/
-			//public MessageObject(int accountNum, TLRPC.Message message, MessageObject replyToMessage, AbstractMap<Long, TLRPC.User> users, AbstractMap<Long, TLRPC.Chat> chats, 
-			//LongSparseArray<TLRPC.User> sUsers, LongSparseArray<TLRPC.Chat> sChats, 
-			//boolean generateLayout, boolean checkMediaExists, long eid)
-			/*
-			XposedHelpers.findAndHookConstructor(lpparam.classLoader.loadClass("org.telegram.messenger.MessageObject"),new Class<?>[]{
-					int.class,
-					lpparam.classLoader.loadClass("org.telegram.tgnet.TLRPC$Message"),
-					lpparam.classLoader.loadClass("org.telegram.messenger.MessageObject"),
-					AbstractMap.class,
-					AbstractMap.class,
-					LongSparseArray.class,
-					LongSparseArray.class,
-					boolean.class,
-					boolean.class,
-					long.class
-				}, new XC_MethodReplacement(){
-
-					@Override
-					protected Object replaceHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable{
-						Object[] args = param.args;
-						int accountNum = args[0];
-						Object message = args[1];
-						Object replyToMessage = args[2];
-						AbstractMap users = (AbstractMap) args[3];
-						AbstractMap chats = (AbstractMap) args[4];
-						LongSparseArray sUsers = (LongSparseArray) args[5];
-						LongSparseArray sChats = (LongSparseArray) args[6];
-						boolean generateLayout = args[7];
-						boolean checkMediaExists = args[8];
-						long eid = args[9];
-						return new MessageObject(accountNum,message,replyToMessage,users,chats,sUsers,sChats,generateLayout,checkMediaExists,eid);
-					}
-				});
-			*/
+			
 			//添加已删除标签
 			Class<?> chatMsgCell = lpparam.classLoader.loadClass("org.telegram.ui.Cells.ChatMessageCell");
 			wantMethod = chatMsgCell.getDeclaredMethod("measureTime", lpparam.classLoader.loadClass("org.telegram.messenger.MessageObject"));
 			//wantMethod.setAccessible(true);
 			XposedBridge.hookMethod(wantMethod, new XC_MethodHook(){
+					
 					@Override
 					protected void afterHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable{
-						Object msg = param.args[0];
-						//deleted变量对消息影响太大
-						String isdel = (String) XposedHelpers.getObjectField(msg,"sponsoredInfo");
-						if(isdel != null){
-							XposedBridge.log("删除文本绘制成功");
+						Object msgObj = param.args[0];
+						Object msg = XposedHelpers.getObjectField(msgObj,"messageOwner");
+						//deleted变量对消息有影响
+						int flags = XposedHelpers.getIntField(msg,"flags");
+						//10000000000000000000000000000
+						if((flags & 0x10000000) != 0){
+							if(BuildConfig.DEBUG)
+								XposedBridge.log("删除标记绘制成功");
 							Object thisMsgCell = param.thisObject;
-							String currentTimeString = XposedHelpers.getObjectField(thisMsgCell,"currentTimeString").toString();
+							CharSequence currentTimeString = (CharSequence) XposedHelpers.getObjectField(thisMsgCell,"currentTimeString");
 							currentTimeString = "已删除 " + currentTimeString;
 							XposedHelpers.setObjectField(thisMsgCell,"currentTimeString",currentTimeString);
 							Class<?> theme = lpparam.classLoader.loadClass("org.telegram.ui.ActionBar.Theme");
 							TextPaint paint = (TextPaint) XposedHelpers.getStaticObjectField(theme,"chat_timePaint");
-							assert paint != null;
 							int delWidth = (int) Math.ceil(paint.measureText("已删除 "));
 							int timeTextWidth = XposedHelpers.getObjectField(thisMsgCell,"timeTextWidth");
 							int timeWidth = XposedHelpers.getObjectField(thisMsgCell,"timeWidth");
@@ -239,25 +256,4 @@ public class AntiRetraction extends HookModule{
 		return super.init();
 	}
 	
-	public class Test extends Object{
-		public Test(int accountNum,Object event , ArrayList<MessageObject> messageObjects, HashMap<String, ArrayList<MessageObject>> messagesByDays, Object chat, int[] mid, boolean addToEnd){
-			super();
-		}
-		//public MessageObject(int accountNum, TLRPC.Message message, MessageObject replyToMessage, AbstractMap<Long, TLRPC.User> users, AbstractMap<Long, TLRPC.Chat> chats, LongSparseArray<TLRPC.User> sUsers, LongSparseArray<TLRPC.Chat> sChats, boolean generateLayout, boolean checkMediaExists, long eid)
-		public Test(int accountNum, Object message, Object replyToMessage, AbstractMap users, AbstractMap chats, LongSparseArray sUsers, LongSparseArray sChats, boolean generateLayout, boolean checkMediaExists, long eid) {
-			super();
-		}
-	}
-	
-	public class MessageObject extends Test{
-		boolean isdelete = false;
-		//public MessageObject(int accountNum, TLRPC.TL_channelAdminLogEvent event, ArrayList<MessageObject> messageObjects, HashMap<String, ArrayList<MessageObject>> messagesByDays, TLRPC.Chat chat, int[] mid, boolean addToEnd) {}
-		public MessageObject(int accountNum,Object event , ArrayList<MessageObject> messageObjects, HashMap<String, ArrayList<MessageObject>> messagesByDays, Object chat, int[] mid, boolean addToEnd) {
-			super(accountNum,event,messageObjects,messagesByDays,chat,mid,addToEnd);
-		}
-		public MessageObject(int accountNum, Object message, Object replyToMessage, AbstractMap users, AbstractMap chats, LongSparseArray sUsers, LongSparseArray sChats, boolean generateLayout, boolean checkMediaExists, long eid) {
-			super(accountNum,message,replyToMessage,users,chats,sUsers,sChats,generateLayout,checkMediaExists,eid);
-		}
-	}
-
 }
