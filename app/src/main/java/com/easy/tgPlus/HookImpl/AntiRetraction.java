@@ -1,28 +1,19 @@
 package com.easy.tgPlus.HookImpl;
+import android.text.TextPaint;
+import android.text.TextUtils;
+import android.util.SparseArray;
+import android.widget.Toast;
+import com.easy.tgPlus.BuildConfig;
 import com.easy.tgPlus.HookModule;
 import com.easy.tgPlus.ModuleConfigs;
 import de.robv.android.xposed.XC_MethodHook;
+import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedBridge;
+import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import android.util.Printer;
-import de.robv.android.xposed.XposedHelpers;
-import de.robv.android.xposed.XC_MethodReplacement;
-import de.robv.android.xposed.XC_MethodHook.MethodHookParam;
-import android.text.SpannableStringBuilder;
-import android.text.TextPaint;
-import com.easy.tgPlus.HookLeader;
-import java.util.Iterator;
 import java.util.ListIterator;
-import java.util.HashMap;
-import java.util.AbstractMap;
-import android.util.LongSparseArray;
-import android.util.SparseArray;
-import android.widget.Toast;
-import java.util.Arrays;
-import de.robv.android.xposed.BuildConfig;
-import android.text.TextUtils;
 
 public class AntiRetraction extends HookModule{
 
@@ -37,7 +28,9 @@ public class AntiRetraction extends HookModule{
 		super(ModuleId, ModuleName, ModuleDoc);
 	}
 	
-	//当前版本最高flag28位
+	//当前版本最高flag在第28位
+	//啊deleted，你比top_Topic多1倍
+	//我觉得这种手法需要在readme里面声明一下危险性
 	public static final int FLAG_DELETED = 1 << 28;
 
 	//如果需要这个功能可以拿走哦，源代码中需保留作者信息
@@ -70,7 +63,7 @@ public class AntiRetraction extends HookModule{
 		try{
 			final ModuleConfigs modConf = ModuleConfigs.getInstance();
 			final XC_LoadPackage.LoadPackageParam lpparam = modConf.getLoadPackageParam();
-			//阻止UI执行删除
+
 			//public boolean processUpdateArray(ArrayList<TLRPC.Update> updates, 
 			//ArrayList<TLRPC.User> usersArr, 
 			//ArrayList<TLRPC.Chat> chatsArr, 
@@ -97,9 +90,8 @@ public class AntiRetraction extends HookModule{
 						while (it.hasNext()) {
 							Object next = it.next();
 							if (udm.isInstance(next)) {
-								//dialogId=0为私聊则需要查UID
+								//dialogId=0为私聊,需要查UID
 								dialogId = 0;
-								//mid ids
 								ArrayList<Integer> delMsg = (ArrayList<Integer>) XposedHelpers.getObjectField(next,"messages");
 								SparseArray<Object> msgs = (SparseArray<Object>) XposedHelpers.getObjectField(param.thisObject,"dialogMessagesByIds");
 								for(int id : delMsg){
@@ -112,12 +104,12 @@ public class AntiRetraction extends HookModule{
 									}									
 									Object mes = XposedHelpers.getObjectField(msgObj,"messageOwner");
 									XposedHelpers.setIntField(mes,"flags", XposedHelpers.getIntField(mes,"flags") | FLAG_DELETED);
+									toast(msgObj);
 								}
-								Object db = XposedHelpers.callMethod(XposedHelpers.callMethod(param.thisObject,"getMessagesStorage"),"getDatabase");
-								
+								markMessagesDeleted(param.thisObject,dialogId,delMsg);
 								it.remove();
-								XposedBridge.log("udm :delMsg size = "+delMsg.size());
 							}else if(udcm.isInstance(next)){
+								//频道消息id为负数(手动取反
 								dialogId = -XposedHelpers.getLongField(next,"channel_id");
 								ArrayList<Integer> delMsg = (ArrayList<Integer>) XposedHelpers.getObjectField(next,"messages");
 								//LongSparseArray<ArrayList<Object>> 
@@ -127,75 +119,81 @@ public class AntiRetraction extends HookModule{
 									if(delMsg.contains(XposedHelpers.callMethod(msgObj,"getId"))){
 										Object mes = XposedHelpers.getObjectField(msgObj,"messageOwner");
 										XposedHelpers.setIntField(mes,"flags", XposedHelpers.getIntField(mes,"flags") | FLAG_DELETED);
-										XposedHelpers.callStaticMethod(lpparam.classLoader.loadClass("org.telegram.messenger.AndroidUtilities"), "runOnUIThread", new Class[]{Runnable.class}, new Object[]{
-												new Runnable(){
-													@Override
-													public void run(){
-														try{
-															CharSequence content = (CharSequence) XposedHelpers.getObjectField(msgObj,"messageText");
-															Toast.makeText(modConf.getContext(),"防撤回:"+content,Toast.LENGTH_SHORT).show();
-														}catch (Exception e){}
-													}
-												}
-											});
+										toast(msgObj);
 									}
 								}
-								Object db = XposedHelpers.callMethod(XposedHelpers.callMethod(param.thisObject,"getMessagesStorage"),"getDatabase");
-								String query = "SELECT data,mid "+
-												"FROM messages_v2 "+
-												"WHERE uid = "+dialogId+" AND mid IN ("+TextUtils.join(",",delMsg)+");";
-
-								String update = "UPDATE messages_v2 SET data = ? WHERE uid = ? AND mid = ?;";
-								Object cursor = XposedHelpers.callMethod(db,"queryFinalized",new Class<?>[]{String.class,Object[].class},new Object[]{query,new Object[]{}});
-								
-								while((boolean)XposedHelpers.callMethod(cursor,"next")){
-									//查询原始data
-									//好像可以从已有的Message对象调用序列化方法直接构造，懒得搞
-									Object data = XposedHelpers.callMethod(cursor,"byteBufferValue",new Class<?>[]{int.class},new Object[]{0});
-									//别问我为什么是int,跟官方源码学的
-									int mid = XposedHelpers.callMethod(cursor,"intValue",new Class<?>[]{int.class},new Object[]{1});
-									XposedHelpers.callMethod(data,"position",new Class<?>[]{int.class},new Object[]{4});
-									int flags = XposedHelpers.callMethod(data,"readInt32",new Class<?>[]{boolean.class},new Object[]{true});
-									flags |= FLAG_DELETED;
-									XposedHelpers.callMethod(data,"position",new Class<?>[]{int.class},new Object[]{4});
-									XposedHelpers.callMethod(data,"writeInt32",new Class<?>[]{int.class},new Object[]{flags});
-									XposedHelpers.callMethod(data,"position",new Class<?>[]{int.class},new Object[]{0});
-									//写入数据库
-									Object state = XposedHelpers.callMethod(db,"executeFast",new Class<?>[]{String.class},new Object[]{update});
-									XposedHelpers.callMethod(state,"bindByteBuffer",new Class<?>[]{int.class,data.getClass()},new Object[]{1,data});
-									//官方也是用的long
-									XposedHelpers.callMethod(state,"bindLong",new Class<?>[]{int.class,long.class},new Object[]{2,dialogId});
-									XposedHelpers.callMethod(state,"bindInteger",new Class<?>[]{int.class,int.class},new Object[]{3,mid});
-									XposedHelpers.callMethod(state,"step");
-									XposedHelpers.callMethod(state,"dispose");
-									
-									XposedBridge.log("flags = "+flags);
-									XposedHelpers.callMethod(data,"reuse");
-								}
-								XposedHelpers.callMethod(cursor,"dispose");
-								XposedBridge.log("SQL执行完毕");
+								markMessagesDeleted(param.thisObject,dialogId,delMsg);
+								//我们迫切的需要在这里刷新对话框的msg!!!
+								//否则只能在view复用重新绑定数据或者退出重进才能发现消息已删除!!!
 								it.remove();
-								XposedBridge.log("udcm :did | channel_id = "+ dialogId + "delMsg size = "+delMsg.size());
 							}
 						}
-						XposedHelpers.callStaticMethod(lpparam.classLoader.loadClass("org.telegram.messenger.AndroidUtilities"), "runOnUIThread", new Class[]{Runnable.class}, new Object[]{
-								new Runnable(){
-									@Override
-									public void run(){
-										
-									}
-								}
-							});
 						return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
 					}
 					
-					public void markMessagesDeleted(int dialogId,ArrayList<Integer> delMsg){
-						
+					public void markMessagesDeleted(Object thisMessagesController, long dialogId,ArrayList<Integer> delMsg){
+						Object db = XposedHelpers.callMethod(XposedHelpers.callMethod(thisMessagesController,"getMessagesStorage"),"getDatabase");
+						String query = "SELECT data,mid,uid "+
+							"FROM messages_v2 "+
+							//如果dialogId = 0，则需要查询UID(作为UPDATE查询的条件)，并且where子句需要添加is_channel = 0
+							//虽然只有mid就能查到，但是官方源码是这么写的，那就照做
+							"WHERE " + (dialogId==0?"is_channel":"uid") + " = "+dialogId+" AND mid IN ("+TextUtils.join(",",delMsg)+");";
+
+						String update = "UPDATE messages_v2 SET data = ? WHERE uid = ? AND mid = ?;";
+						Object cursor = XposedHelpers.callMethod(db,"queryFinalized",new Class<?>[]{String.class,Object[].class},new Object[]{query,new Object[]{}});
+						Object state = XposedHelpers.callMethod(db,"executeFast",new Class<?>[]{String.class},new Object[]{update});
+
+						while((boolean)XposedHelpers.callMethod(cursor,"next")){
+							//查询原始data
+							Object data = XposedHelpers.callMethod(cursor,"byteBufferValue",new Class<?>[]{int.class},new Object[]{0});
+							//别问我为什么是int,官方自己就用的ArrayList<Integer>
+							int mid = XposedHelpers.callMethod(cursor,"intValue",new Class<?>[]{int.class},new Object[]{1});
+							dialogId = XposedHelpers.callMethod(cursor,"longValue",new Class<?>[]{int.class},new Object[]{2});
+
+							XposedHelpers.callMethod(data,"position",new Class<?>[]{int.class},new Object[]{4});
+							int flags = XposedHelpers.callMethod(data,"readInt32",new Class<?>[]{boolean.class},new Object[]{true});
+							flags |= FLAG_DELETED;
+							XposedHelpers.callMethod(data,"position",new Class<?>[]{int.class},new Object[]{4});
+							XposedHelpers.callMethod(data,"writeInt32",new Class<?>[]{int.class},new Object[]{flags});
+							XposedHelpers.callMethod(data,"position",new Class<?>[]{int.class},new Object[]{0});
+
+							//重新查询(UPDATE)
+							XposedHelpers.callMethod(state,"requery");
+							XposedHelpers.callMethod(state,"bindByteBuffer",new Class<?>[]{int.class,data.getClass()},new Object[]{1,data});
+							XposedHelpers.callMethod(state,"bindLong",new Class<?>[]{int.class,long.class},new Object[]{2,dialogId});
+							XposedHelpers.callMethod(state,"bindInteger",new Class<?>[]{int.class,int.class},new Object[]{3,mid});
+							XposedHelpers.callMethod(state,"step");
+							
+							XposedHelpers.callMethod(data,"reuse");
+							if(BuildConfig.DEBUG)
+								XposedBridge.log("flags = "+flags);
+						}
+						XposedHelpers.callMethod(cursor,"dispose");
+						XposedHelpers.callMethod(state,"dispose");
+						if(BuildConfig.DEBUG)
+							XposedBridge.log("标记消息 :dialogId | channel_id = "+ dialogId + " delMsg size = "+delMsg.size());
+					}
+					
+					public void toast(final Object msgObj){
+						//像这样形成一个三角形的函数调用我们称之为"三角函数"
+						try{
+							XposedHelpers.callStaticMethod(lpparam.classLoader.loadClass("org.telegram.messenger.AndroidUtilities"), "runOnUIThread", new Class[]{Runnable.class}, new Object[]{
+									new Runnable(){
+										@Override
+										public void run(){
+											try{
+												CharSequence content = (CharSequence) XposedHelpers.getObjectField(msgObj, "messageText");
+												Toast.makeText(modConf.getContext(), "防撤回:" + content, Toast.LENGTH_SHORT).show();
+											}catch (Exception e){}
+										}
+									}
+								});
+						}catch (ClassNotFoundException e){}
 					}
 					
 				});
 			
-			zlass = lpparam.classLoader.loadClass("org.telegram.messenger.MessagesStorage");
+			//zlass = lpparam.classLoader.loadClass("org.telegram.messenger.MessagesStorage");
 			/*
 			markMethodZero(zlass,"markMessagesAsDeleted");
 			markMethodZero(zlass,"updateDialogsWithDeletedMessages");
@@ -243,10 +241,9 @@ public class AntiRetraction extends HookModule{
 						//deleted变量对消息有影响
 						int flags = XposedHelpers.getIntField(msg,"flags");
 						//10000000000000000000000000000
-						if((flags & 0x10000000) != 0){
-							//此处无法获取到BuildConfig类
-							//if(BuildConfig.DEBUG)
-							//	XposedBridge.log("删除标记绘制成功");
+						if((flags & FLAG_DELETED) != 0){
+							if(BuildConfig.DEBUG)
+								XposedBridge.log("删除标记绘制成功");
 							Object thisMsgCell = param.thisObject;
 							CharSequence currentTimeString = (CharSequence) XposedHelpers.getObjectField(thisMsgCell,"currentTimeString");
 							currentTimeString = "已删除 " + currentTimeString;

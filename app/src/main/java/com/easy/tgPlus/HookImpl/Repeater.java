@@ -19,8 +19,6 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.lang.reflect.Method;
-import java.util.Arrays;
 
 public class Repeater extends HookModule{
 

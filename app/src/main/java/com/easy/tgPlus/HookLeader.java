@@ -27,7 +27,6 @@ public class HookLeader implements IXposedHookLoadPackage,IXposedHookInitPackage
 	public void handleInitPackageResources(XC_InitPackageResources.InitPackageResourcesParam resParam) throws Throwable{
 		String pkName = resParam.packageName;
 		if (modConf.isTargetPackage(pkName)){
-
 			if (BuildConfig.DEBUG){
 				testId = resParam.res.getIdentifier("EditedMessage", "string", pkName);
 				XposedBridge.log("正在检测字符串(" + resParam.res.getString(testId) + ")调用堆栈");
@@ -85,21 +84,19 @@ public class HookLeader implements IXposedHookLoadPackage,IXposedHookInitPackage
 				}
 			});
 
+		//这里也需要修改一下
 		HookModule hm = new UnlockCopySave();
 		modConf.addHookModule(hm);
-		if (BuildConfig.DEBUG){
-			XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
-		}
+		XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+
 		hm = new Repeater();
 		modConf.addHookModule(hm);
-		if (BuildConfig.DEBUG){
-			XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
-		}
+		XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+
 		hm = new AntiRetraction();
 		modConf.addHookModule(hm);
-		if (BuildConfig.DEBUG){
-			XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
-		}
+		XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+		
 
 		//debug
 		if (BuildConfig.DEBUG){

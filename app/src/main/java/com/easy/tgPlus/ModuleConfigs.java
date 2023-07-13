@@ -104,7 +104,11 @@ public class ModuleConfigs{
 	public void upDateSwitch(){
 		SharedPreferences sp = getConf();
 		for(HookModule h : modList.values()){
-			h.setSwitchOn(sp.getBoolean(h.getModuleId(),false));
+			//有没有好心人帮我把HookModule改成接口
+			//顺便帮我把get set都实现一下
+			//顺便把设置页面搞出来
+			//诶嘿
+			h.setSwitchOn(sp.getBoolean(h.getModuleId(),/*false*/true));
 			XposedBridge.log("模块 " + h.getModuleName() +" 激活状态变更 ->" + sp.getBoolean(h.getModuleId(),false));
 		}
 	}
