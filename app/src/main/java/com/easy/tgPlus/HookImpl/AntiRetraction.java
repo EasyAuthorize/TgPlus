@@ -141,16 +141,19 @@ public class AntiRetraction extends HookModule{
 									}
 								}
 								Object db = XposedHelpers.callMethod(XposedHelpers.callMethod(param.thisObject,"getMessagesStorage"),"getDatabase");
-								String update = "SELECT data "+
+								String query = "SELECT data,mid "+
 												"FROM messages_v2 "+
 												"WHERE uid = "+dialogId+" AND mid IN ("+TextUtils.join(",",delMsg)+");";
-								Object cursor = XposedHelpers.callMethod(db,"queryFinalized",new Class<?>[]{String.class,Object[].class},new Object[]{update,new Object[]{}});
+
+								String update = "UPDATE messages_v2 SET data = ? WHERE uid = ? AND mid = ?;";
+								Object cursor = XposedHelpers.callMethod(db,"queryFinalized",new Class<?>[]{String.class,Object[].class},new Object[]{query,new Object[]{}});
 								
 								while((boolean)XposedHelpers.callMethod(cursor,"next")){
 									//查询原始data
 									//好像可以从已有的Message对象调用序列化方法直接构造，懒得搞
 									Object data = XposedHelpers.callMethod(cursor,"byteBufferValue",new Class<?>[]{int.class},new Object[]{0});
-									
+									//别问我为什么是int,跟官方源码学的
+									int mid = XposedHelpers.callMethod(cursor,"intValue",new Class<?>[]{int.class},new Object[]{1});
 									XposedHelpers.callMethod(data,"position",new Class<?>[]{int.class},new Object[]{4});
 									int flags = XposedHelpers.callMethod(data,"readInt32",new Class<?>[]{boolean.class},new Object[]{true});
 									flags |= FLAG_DELETED;
@@ -158,6 +161,14 @@ public class AntiRetraction extends HookModule{
 									XposedHelpers.callMethod(data,"writeInt32",new Class<?>[]{int.class},new Object[]{flags});
 									XposedHelpers.callMethod(data,"position",new Class<?>[]{int.class},new Object[]{0});
 									//写入数据库
+									Object state = XposedHelpers.callMethod(db,"executeFast",new Class<?>[]{String.class},new Object[]{update});
+									XposedHelpers.callMethod(state,"bindByteBuffer",new Class<?>[]{int.class,data.getClass()},new Object[]{1,data});
+									//官方也是用的long
+									XposedHelpers.callMethod(state,"bindLong",new Class<?>[]{int.class,long.class},new Object[]{2,dialogId});
+									XposedHelpers.callMethod(state,"bindInteger",new Class<?>[]{int.class,int.class},new Object[]{3,mid});
+									XposedHelpers.callMethod(state,"step");
+									XposedHelpers.callMethod(state,"dispose");
+									
 									XposedBridge.log("flags = "+flags);
 									XposedHelpers.callMethod(data,"reuse");
 								}
@@ -233,8 +244,9 @@ public class AntiRetraction extends HookModule{
 						int flags = XposedHelpers.getIntField(msg,"flags");
 						//10000000000000000000000000000
 						if((flags & 0x10000000) != 0){
-							if(BuildConfig.DEBUG)
-								XposedBridge.log("删除标记绘制成功");
+							//此处无法获取到BuildConfig类
+							//if(BuildConfig.DEBUG)
+							//	XposedBridge.log("删除标记绘制成功");
 							Object thisMsgCell = param.thisObject;
 							CharSequence currentTimeString = (CharSequence) XposedHelpers.getObjectField(thisMsgCell,"currentTimeString");
 							currentTimeString = "已删除 " + currentTimeString;
