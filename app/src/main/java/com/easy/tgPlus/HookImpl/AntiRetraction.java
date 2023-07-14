@@ -101,10 +101,11 @@ public class AntiRetraction extends HookModule{
 										//这里如果查找不到说明这条消息不是正在显示(猜的
 										XposedBridge.log("udm :delMsg size = "+delMsg.size()+" find msgObj = null");
 										break;
-									}									
-									Object mes = XposedHelpers.getObjectField(msgObj,"messageOwner");
-									XposedHelpers.setIntField(mes,"flags", XposedHelpers.getIntField(mes,"flags") | FLAG_DELETED);
-									toast(msgObj);
+									}else{
+										Object mes = XposedHelpers.getObjectField(msgObj,"messageOwner");
+										XposedHelpers.setIntField(mes,"flags", XposedHelpers.getIntField(mes,"flags") | FLAG_DELETED);
+										//toast(msgObj);
+									}
 								}
 								markMessagesDeleted(param.thisObject,dialogId,delMsg);
 								it.remove();
@@ -115,13 +116,18 @@ public class AntiRetraction extends HookModule{
 								//LongSparseArray<ArrayList<Object>> 
 								Object laMsgs = XposedHelpers.getObjectField(param.thisObject,"dialogMessage");
 								ArrayList<Object> objs = (ArrayList<Object>) XposedHelpers.callMethod(laMsgs,"get",new Class<?>[]{int.class},new Object[]{dialogId});
-								for(final Object msgObj : objs){
-									if(delMsg.contains(XposedHelpers.callMethod(msgObj,"getId"))){
-										Object mes = XposedHelpers.getObjectField(msgObj,"messageOwner");
-										XposedHelpers.setIntField(mes,"flags", XposedHelpers.getIntField(mes,"flags") | FLAG_DELETED);
-										toast(msgObj);
+								if(objs == null){
+									XposedBridge.log("udcm :delMsg size = "+delMsg.size()+" find msgObj = null");
+								} else{
+									for(final Object msgObj : objs){
+										if(delMsg.contains(XposedHelpers.callMethod(msgObj,"getId"))){
+											Object mes = XposedHelpers.getObjectField(msgObj,"messageOwner");
+											XposedHelpers.setIntField(mes,"flags", XposedHelpers.getIntField(mes,"flags") | FLAG_DELETED);
+											//toast(msgObj);
+										}
 									}
 								}
+								
 								markMessagesDeleted(param.thisObject,dialogId,delMsg);
 								//我们迫切的需要在这里刷新对话框的msg!!!
 								//否则只能在view复用重新绑定数据或者退出重进才能发现消息已删除!!!

@@ -1,8 +1,7 @@
 # TgPlus
 
 [![Xposed](https://img.shields.io/badge/-Xposed-green?style=flat&logo=Android&logoColor=white)](#)
-[![GitHub all releases](https://img.shields.io/github/downloads/EasyAuthorize/TgPlus/total?label=Downloads)](https://github.com/EasyAuthorize/TgPlus/releases)
-  
+[![GitHub all releases](https://img.shields.io/github/downloads/EasyAuthorize/TgPlus/total?label=Downloads)](https://github.com/EasyAuthorize/TgPlus/releases)  
 Xposed-Modules-Repo  
 [![GitHub all releases](https://img.shields.io/github/downloads/Xposed-Modules-Repo/com.easy.tgPlus/total?label=Downloads)](https://github.com/Xposed-Modules-Repo/com.easy.tgPlus/releases)
 

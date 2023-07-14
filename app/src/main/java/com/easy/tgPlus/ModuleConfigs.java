@@ -34,7 +34,10 @@ public class ModuleConfigs{
 		"org.aka.messenger", 
 		"ellipi.messenger", 
 		"org.nift4.catox", 
-		"it.owlgram.android"
+		"it.owlgram.android",
+
+		"xyz.nextalone.nagram",
+		"uz.unnarsx.cherrygram"
 	);
 
 	//放在这里会导致初始化过程该变量为空
@@ -108,8 +111,9 @@ public class ModuleConfigs{
 			//顺便帮我把get set都实现一下
 			//顺便把设置页面搞出来
 			//诶嘿
-			h.setSwitchOn(sp.getBoolean(h.getModuleId(),/*false*/true));
-			XposedBridge.log("模块 " + h.getModuleName() +" 激活状态变更 ->" + sp.getBoolean(h.getModuleId(),false));
+			boolean switchOn = sp.getBoolean(h.getModuleId(),/*false*/true);
+			h.setSwitchOn(switchOn);
+			XposedBridge.log("模块 " + h.getModuleName() +" 激活状态变更 -> " + switchOn);
 		}
 	}
 	
