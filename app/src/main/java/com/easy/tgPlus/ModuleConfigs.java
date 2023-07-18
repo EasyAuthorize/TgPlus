@@ -38,6 +38,7 @@ public class ModuleConfigs{
 
 		"xyz.nextalone.nagram",
 		"uz.unnarsx.cherrygram"
+		,"com.easy.virtualsight"
 	);
 
 	//放在这里会导致初始化过程该变量为空
@@ -55,6 +56,10 @@ public class ModuleConfigs{
 
 	private ModuleConfigs(){
 		//单例
+	}
+
+	public void setProcName(String procName){
+		XposedBridge.log("进程:"+procName);
 	}
 
 	public boolean isThisPackage(String runPackageName){
@@ -101,19 +106,15 @@ public class ModuleConfigs{
 	}
 	
 	public void addHookModule(HookModule hMod){
-		modList.put(hMod.getModuleId(),hMod);
+		modList.put(hMod.impl.getModuleId(),hMod);
 	}
 	
 	public void upDateSwitch(){
 		SharedPreferences sp = getConf();
 		for(HookModule h : modList.values()){
-			//有没有好心人帮我把HookModule改成接口
-			//顺便帮我把get set都实现一下
-			//顺便把设置页面搞出来
-			//诶嘿
-			boolean switchOn = sp.getBoolean(h.getModuleId(),/*false*/true);
+			boolean switchOn = sp.getBoolean(h.impl.getModuleId(),/*false*/true);
 			h.setSwitchOn(switchOn);
-			XposedBridge.log("模块 " + h.getModuleName() +" 激活状态变更 -> " + switchOn);
+			XposedBridge.log("模块 " + h.impl.getModuleName() +" 激活状态变更 -> " + switchOn);
 		}
 	}
 	

@@ -38,18 +38,20 @@ public class HookLeader implements IXposedHookLoadPackage,IXposedHookInitPackage
 
 	@Override
 	public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable{
-		String runPackageName = lpparam.packageName;
+		String packageName = lpparam.packageName;
+		String procName = lpparam.processName;
 
-		if (modConf.isThisPackage(runPackageName)){
+		if (modConf.isThisPackage(packageName)){
 			Class<?> mainActivity = lpparam.classLoader.loadClass("com.easy.tgPlus.MainActivity");
 			XposedHelpers.findAndHookMethod(mainActivity, "isActivate", XC_MethodReplacement.returnConstant(true));
 			//测试
 			return;
 		}
 
-		if (!modConf.isTargetPackage(runPackageName))return;
+		if (!modConf.isTargetPackage(packageName))return;
 		modConf.setLoadPackageParam(lpparam);
-		modConf.setRunPackage(runPackageName);
+		modConf.setRunPackage(packageName);
+		modConf.setProcName(procName);
 		//程序启动后获得上下文
 		//attachBaseContext
 		XposedHelpers.findAndHookMethod(Application.class, "attach", Context.class, new XC_MethodHook() {
@@ -85,23 +87,22 @@ public class HookLeader implements IXposedHookLoadPackage,IXposedHookInitPackage
 			});
 
 		//这里也需要修改一下
-		HookModule hm = new UnlockCopySave();
+		HookModule hm = new HookModule(new UnlockCopySave());
 		modConf.addHookModule(hm);
-		XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+		XposedBridge.log("模块:" + hm.impl.getModuleId() + "(" + hm.impl.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
 
-		hm = new Repeater();
+		hm = new HookModule(new Repeater());
 		modConf.addHookModule(hm);
-		XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+		XposedBridge.log("模块:" + hm.impl.getModuleId() + "(" + hm.impl.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
 
-		hm = new AntiRetraction();
+		hm = new HookModule(new AntiRetraction());
 		modConf.addHookModule(hm);
-		XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+		XposedBridge.log("模块:" + hm.impl.getModuleId() + "(" + hm.impl.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
 		
 
 		//debug
 		if (BuildConfig.DEBUG){
 			//打印调用堆栈
-			if (true)return;
 			XposedHelpers.findAndHookMethod("org.telegram.messenger.LocaleController", lpparam.classLoader, "getString", String.class , int.class, new XC_MethodHook(){
 					@Override
 					protected void beforeHookedMethod(MethodHookParam param) throws Throwable{
@@ -183,7 +184,7 @@ public class HookLeader implements IXposedHookLoadPackage,IXposedHookInitPackage
 	}
 
 	public static void log(HookModule hm){
-		XposedBridge.log("模块:" + hm.ModuleId + "(" + hm.ModuleName + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+		XposedBridge.log("模块:" + hm.impl.getModuleId() + "(" + hm.impl.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
 	}
 
 }
