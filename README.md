@@ -6,7 +6,8 @@ Xposed-Modules-Repo
 [![GitHub all releases](https://img.shields.io/github/downloads/Xposed-Modules-Repo/com.easy.tgPlus/total?label=Downloads)](https://github.com/Xposed-Modules-Repo/com.easy.tgPlus/releases)
 
 ## 模块简介
-这是一个Xposed模块
+这是一个Xposed模块  
+***此项目使用GPTv3许可证***
 
 ## 食用方法
 请提前准备好Xposed环境  
@@ -30,5 +31,4 @@ Xposed-Modules-Repo
 ***版本更新时可能会丢失全部聊天记录***
 
 ## 写在后面
-模块完全开源  
-为了世界上所有的美好而战😋
+模块完全开源
