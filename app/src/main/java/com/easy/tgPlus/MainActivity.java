@@ -16,23 +16,17 @@ public class MainActivity extends Activity{
 
 		@Override
 		public void onClick(View v){
-			int oid = v.getId();
+			int vid = v.getId();
 
-			if (oid == R.id.Btn_start){
-                ModuleConfigs modConf = ModuleConfigs.getInstance();
-				SharedPreferences.Editor edit = modConf.getConf().edit();
-				edit.putString("Test", "test");
-				edit.apply();
-				//Toast.makeText(modConf.con,"测试:配置写入",Toast.LENGTH_LONG).show();
-			}else if (oid == R.id.Btn_stop){
-				ModuleConfigs modConf = ModuleConfigs.getInstance();
-				SharedPreferences sp = modConf.getConf();
-				String str = sp.getString("Test", null);
-				Toast.makeText(modConf.con, str == null ? "测试配置不存在": str, Toast.LENGTH_SHORT).show();
-			}else if (oid == R.id.Btn_test){
+			if (vid == R.id.Btn_start){
+				//
+				Toast.makeText(MainActivity.this,"isActivate2:"+isActivate2(), Toast.LENGTH_SHORT).show();
+			}else if (vid == R.id.Btn_stop){
+				Toast.makeText(MainActivity.this,"stop", Toast.LENGTH_SHORT).show();
+			}else if (vid == R.id.Btn_test){
                 Toast.makeText(MainActivity.this, "测试" + getApplicationContext().getPackageResourcePath() + 10 / 0, Toast.LENGTH_SHORT).show();
 			}else{
-				Toast.makeText(MainActivity.this, "此ID(" + oid + ")事件未注册", Toast.LENGTH_SHORT).show();
+				Toast.makeText(MainActivity.this, "此ID(" + vid + ")事件未注册", Toast.LENGTH_SHORT).show();
 			}
 		}
 
@@ -63,7 +57,7 @@ public class MainActivity extends Activity{
 
 		btn = new Button(MainActivity.this);
 		btn.setText("test");
-		btn.setId(R.id.Btn_stop);
+		btn.setId(R.id.Btn_test);
 		btn.setOnClickListener(myOnclick);
 		rootlayout.addView(btn);
 
@@ -80,8 +74,12 @@ public class MainActivity extends Activity{
 		setContentView(rootlayout);
     }
 
-	private static boolean isActivate(){
+	private static final boolean isActivate(){
 		return false;
+	}
+	
+	private static final boolean isActivate2(){
+		return true;
 	}
 
 } 

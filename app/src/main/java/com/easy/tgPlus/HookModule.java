@@ -1,6 +1,6 @@
 package com.easy.tgPlus;
 
-public class HookModule {
+public abstract class HookModule {
 
     public static final String TAG = "HookModule";
 
@@ -9,33 +9,25 @@ public class HookModule {
 	//是否启用
 	private boolean switchOn;
 
-	public HookModule.Impl impl;
-
-	public HookModule(HookModule.Impl impl) throws Throwable {
-		this.impl = impl;
-		loadSuccess = impl.init();
+	public HookModule(){
+		//init();
 	}
 
-	public void setSwitchOn(boolean switchOn) {
-		if (this.switchOn != switchOn) {
-			impl.setSwitchOn(switchOn);
-			this.switchOn = switchOn;
-		}
+	public final void setSwitchOn(boolean switchOn) {
+		this.switchOn = switchOn;
 	}
 
-	public boolean isSwitchOn() {
-		return switchOn;
+	public final boolean getSwitchOn() {
+		return this.switchOn;
 	}
 
-	public boolean isLoadSuccess() {
+	public final boolean isLoadSuccess() {
 		return loadSuccess;
 	}
 
-	public interface Impl {
-		public abstract String getModuleId();
-		public abstract String getModuleName();
-		public abstract String getModuleDoc();
-		public abstract boolean init() throws Throwable;
-		public abstract void setSwitchOn(boolean switchOn);
-	}
+	public abstract String getModuleId();
+	public abstract String getModuleName();
+	public abstract String getModuleDoc();
+	public abstract boolean init() throws Throwable;
+	public abstract boolean isHideModule();
 }

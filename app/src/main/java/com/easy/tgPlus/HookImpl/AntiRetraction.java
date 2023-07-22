@@ -15,7 +15,13 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.ListIterator;
 
-public class AntiRetraction implements HookModule.Impl {
+public class AntiRetraction extends HookModule {
+
+	@Override
+	public boolean isHideModule() {
+		return false;
+	}
+	
 
     //模块标签
     public static final String ModuleId = "AntiRetraction";
@@ -32,8 +38,6 @@ public class AntiRetraction implements HookModule.Impl {
 	//updateWidgets(dialogsIds);
 	//dialogsToUpdate.get(did);
 
-	private boolean isSwitchOn;
-
 	@Override
 	public String getModuleId() {
 		return ModuleId;
@@ -47,11 +51,6 @@ public class AntiRetraction implements HookModule.Impl {
 	@Override
 	public String getModuleDoc() {
 		return ModuleDoc;
-	}
-
-	@Override
-	public void setSwitchOn(boolean switchOn) {
-		isSwitchOn = switchOn;
 	}
 
 	@Override
@@ -71,7 +70,7 @@ public class AntiRetraction implements HookModule.Impl {
 		XposedBridge.hookMethod(wantMethod, new XC_MethodReplacement(){
 				@Override
 				protected Object replaceHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
-					if (isSwitchOn) {
+					if (getSwitchOn()) {
 						return beforeHookedMethod2(param);
 					}
 					return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
@@ -203,7 +202,7 @@ public class AntiRetraction implements HookModule.Impl {
 
 				@Override
 				protected void afterHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
-					if(!isSwitchOn)return;
+					//if (!getSwitchOn())return;
 					Object msgObj = param.args[0];
 					Object msg = XposedHelpers.getObjectField(msgObj, "messageOwner");
 					//deleted变量对消息有影响

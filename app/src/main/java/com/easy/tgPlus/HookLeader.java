@@ -16,6 +16,8 @@ import java.util.HashMap;
 import de.robv.android.xposed.IXposedHookInitPackageResources;
 import de.robv.android.xposed.callbacks.XC_InitPackageResources.InitPackageResourcesParam;
 import de.robv.android.xposed.callbacks.XC_InitPackageResources;
+import java.lang.reflect.Method;
+import java.lang.annotation.Annotation;
 
 public class HookLeader implements IXposedHookLoadPackage,IXposedHookInitPackageResources{
 
@@ -43,7 +45,8 @@ public class HookLeader implements IXposedHookLoadPackage,IXposedHookInitPackage
 
 		if (modConf.isThisPackage(packageName)){
 			Class<?> mainActivity = lpparam.classLoader.loadClass("com.easy.tgPlus.MainActivity");
-			XposedHelpers.findAndHookMethod(mainActivity, "isActivate", XC_MethodReplacement.returnConstant(true));
+			Method m = com.easy.tgPlus.MainActivity.class.getDeclaredMethod("isActivate");
+			XposedHelpers.findAndHookMethod(mainActivity, m.getName(),XC_MethodReplacement.returnConstant(true));
 			//测试
 			return;
 		}
@@ -85,19 +88,18 @@ public class HookLeader implements IXposedHookLoadPackage,IXposedHookInitPackage
 					}
 				}
 			});
-
-		//这里也需要修改一下
-		HookModule hm = new HookModule(new UnlockCopySave());
+		
+		HookModule hm = new UnlockCopySave();
 		modConf.addHookModule(hm);
-		XposedBridge.log("模块:" + hm.impl.getModuleId() + "(" + hm.impl.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+		XposedBridge.log("模块:" + hm.getModuleId() + "(" + hm.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
 
-		hm = new HookModule(new Repeater());
+		hm = new Repeater();
 		modConf.addHookModule(hm);
-		XposedBridge.log("模块:" + hm.impl.getModuleId() + "(" + hm.impl.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+		XposedBridge.log("模块:" + hm.getModuleId() + "(" + hm.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
 
-		hm = new HookModule(new AntiRetraction());
+		hm = new AntiRetraction();
 		modConf.addHookModule(hm);
-		XposedBridge.log("模块:" + hm.impl.getModuleId() + "(" + hm.impl.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+		XposedBridge.log("模块:" + hm.getModuleId() + "(" + hm.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
 		
 
 		//debug
@@ -184,7 +186,7 @@ public class HookLeader implements IXposedHookLoadPackage,IXposedHookInitPackage
 	}
 
 	public static void log(HookModule hm){
-		XposedBridge.log("模块:" + hm.impl.getModuleId() + "(" + hm.impl.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+		XposedBridge.log("模块:" + hm.getModuleId() + "(" + hm.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
 	}
 
 }

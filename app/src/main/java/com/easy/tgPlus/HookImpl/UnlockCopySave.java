@@ -7,7 +7,13 @@ import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
-public class UnlockCopySave implements HookModule.Impl {
+public class UnlockCopySave extends HookModule {
+
+	@Override
+	public boolean isHideModule() {
+		return false;
+	}
+
 
     //模块标签
     public static final String ModuleId = "UnlockCopySave";
@@ -15,8 +21,6 @@ public class UnlockCopySave implements HookModule.Impl {
 	public static final String ModuleName = "解锁复制保存";
 	//模块描述
 	public static final String ModuleDoc = "解除内容保护，允许复制保存消息";
-	
-	private boolean isSwitchOn;
 
 	@Override
 	public String getModuleId(){
@@ -32,11 +36,6 @@ public class UnlockCopySave implements HookModule.Impl {
 	public String getModuleDoc(){
 		return ModuleDoc;
 	}
-
-	@Override
-	public void setSwitchOn(boolean switchOn) {
-		isSwitchOn = switchOn;
-	}
 	
 	@Override
 	public boolean init() throws Throwable{
@@ -51,7 +50,7 @@ public class UnlockCopySave implements HookModule.Impl {
 				new XC_MethodHook(){
 					@Override
 					public void afterHookedMethod(MethodHookParam param){
-						if(isSwitchOn){
+						if(getSwitchOn()){
 							param.setResult(false);
 						}
 					}

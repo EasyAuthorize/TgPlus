@@ -106,15 +106,15 @@ public class ModuleConfigs{
 	}
 	
 	public void addHookModule(HookModule hMod){
-		modList.put(hMod.impl.getModuleId(),hMod);
+		modList.put(hMod.getModuleId(),hMod);
 	}
 	
 	public void upDateSwitch(){
 		SharedPreferences sp = getConf();
 		for(HookModule h : modList.values()){
-			boolean switchOn = sp.getBoolean(h.impl.getModuleId(),/*false*/true);
+			boolean switchOn = sp.getBoolean(h.getModuleId(),/*false*/true);
 			h.setSwitchOn(switchOn);
-			XposedBridge.log("模块 " + h.impl.getModuleName() +" 激活状态变更 -> " + switchOn);
+			XposedBridge.log("模块 " + h.getModuleName() +" 激活状态变更 -> " + switchOn);
 		}
 	}
 	

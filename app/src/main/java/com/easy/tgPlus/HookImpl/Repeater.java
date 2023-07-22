@@ -20,7 +20,13 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-public class Repeater implements HookModule.Impl {
+public class Repeater extends HookModule {
+
+	@Override
+	public boolean isHideModule() {
+		return false;
+	}
+	
 
     //模块标签
     public static final String ModuleId = "Repeater";
@@ -28,8 +34,6 @@ public class Repeater implements HookModule.Impl {
 	public static final String ModuleName = "复读机";
 	//模块描述
 	public static final String ModuleDoc = "点击消息的弹出菜单增加+1选项，点击后自动发送该消息的文本内容";
-
-	private boolean isSwitchOn;
 
 	@Override
 	public String getModuleId() {
@@ -46,11 +50,6 @@ public class Repeater implements HookModule.Impl {
 		return ModuleDoc;
 	}
 
-	@Override
-	public void setSwitchOn(boolean switchOn) {
-		isSwitchOn = switchOn;
-	}
-
     @Override
 	public boolean init() throws Throwable {
 		//解锁复制保存
@@ -63,7 +62,7 @@ public class Repeater implements HookModule.Impl {
 		XposedHelpers.findAndHookMethod("org.telegram.ui.Components.ChatScrimPopupContainerLayout", lpparam.classLoader, "setPopupWindowLayout", lpparam.classLoader.loadClass("org.telegram.ui.ActionBar.ActionBarPopupWindow$ActionBarPopupWindowLayout"), new XC_MethodHook(){
 				@Override
 				protected void beforeHookedMethod(MethodHookParam param) {
-					if (!isSwitchOn) {return;}
+					if (!getSwitchOn()) {return;}
 					Resources res = modConf.getContext().getResources();
 					final Object t = param.thisObject;
 					XposedBridge.log(t.toString());
