@@ -56,7 +56,7 @@ public class AntiRetraction extends HookModule {
 	@Override
 	public boolean init() throws Throwable {
 
-		final ModuleConfigs modConf = ModuleConfigs.getInstance();
+		final ModuleConfigs modConf = this.getModuleConfigs();
 		final XC_LoadPackage.LoadPackageParam lpparam = modConf.getLoadPackageParam();
 
 		//public boolean processUpdateArray(ArrayList<TLRPC.Update> updates, 

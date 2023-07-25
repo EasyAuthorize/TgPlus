@@ -1,4 +1,5 @@
 package com.easy.tgPlus;
+import de.robv.android.xposed.XposedBridge;
 
 public abstract class HookModule {
 
@@ -8,12 +9,10 @@ public abstract class HookModule {
 	private boolean loadSuccess;
 	//是否启用
 	private boolean switchOn;
+	
+	private ModuleConfigs conf;
 
-	public HookModule(){
-		//init();
-	}
-
-	public final void setSwitchOn(boolean switchOn) {
+	public void setSwitchOn(boolean switchOn) {
 		this.switchOn = switchOn;
 	}
 
@@ -24,10 +23,33 @@ public abstract class HookModule {
 	public final boolean isLoadSuccess() {
 		return loadSuccess;
 	}
+	
+	public ModuleConfigs getModuleConfigs(){
+		return this.conf;
+	}
+	
+	public void setModuleConfigs(ModuleConfigs conf){
+		this.conf = conf;
+	}
+	
+	public void load() throws Throwable{
+		loadSuccess = init();
+	}
 
 	public abstract String getModuleId();
 	public abstract String getModuleName();
 	public abstract String getModuleDoc();
 	public abstract boolean init() throws Throwable;
 	public abstract boolean isHideModule();
+	
+	//感觉接口不好用
+	public interface Impl{
+		public abstract String getModuleId();
+		public abstract String getModuleName();
+		public abstract String getModuleDoc();
+		public abstract boolean init(ModuleConfigs mConf) throws Throwable;
+		public abstract boolean isHideModule();
+		public abstract void switchCallBack();
+	}
+	
 }

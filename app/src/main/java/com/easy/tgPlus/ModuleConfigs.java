@@ -1,19 +1,21 @@
 package com.easy.tgPlus;
-import android.app.ActivityThread;
+import android.app.Activity;
+import android.app.Application;
 import android.content.Context;
-import java.util.List;
 import android.content.SharedPreferences;
-import java.util.Arrays;
-import android.app.AndroidAppHelper;
-import de.robv.android.xposed.callbacks.XC_LoadPackage;
-import de.robv.android.xposed.callbacks.XC_InitPackageResources;
-import de.robv.android.xposed.callbacks.XC_InitPackageResources.InitPackageResourcesParam;
-import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
-import android.content.res.Resources;
-import java.util.HashMap;
+import android.os.Bundle;
+import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
+import de.robv.android.xposed.XposedHelpers;
+import de.robv.android.xposed.callbacks.XC_LoadPackage;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import com.easy.Pointer;
+import java.util.ArrayList;
 
-public class ModuleConfigs{
+public class ModuleConfigs {
 
     public static final String TAG = "ModuleConfigs";
 
@@ -35,91 +37,169 @@ public class ModuleConfigs{
 		"ellipi.messenger", 
 		"org.nift4.catox", 
 		"it.owlgram.android",
-
 		"xyz.nextalone.nagram",
 		"uz.unnarsx.cherrygram"
-		,"com.easy.virtualsight"
+		//test
+		, "com.easy.virtualsight"
 	);
 
-	//放在这里会导致初始化过程该变量为空
-	//但是我也不想在get方法写判断，反正委屈一下开发者就行了
-	//等有空了移除掉单例模式，兼容一下多进程hook
-	private static ModuleConfigs INSTANCE = new ModuleConfigs();
-
 	Context con = null;//AndroidAppHelper.currentApplication();
+	Activity topActivity = null;
 	String runPackage = null;
+	String procName = null;
 	SharedPreferences conf;
 
 	XC_LoadPackage.LoadPackageParam loadPackage;
-	
+
 	HashMap<String,HookModule> modList = new  HashMap<String,HookModule>();
 
-	private ModuleConfigs(){
-		//单例
+	public ModuleConfigs(XC_LoadPackage.LoadPackageParam lpparam) {
+		this();
+		String packageName = lpparam.packageName;
+		String procName = lpparam.processName;
+		setLoadPackageParam(lpparam);
+		setRunPackage(packageName);
+		setProcName(procName);
 	}
 
-	public void setProcName(String procName){
-		XposedBridge.log("进程:"+procName);
+	private ArrayList<Runnable> createActivityCallBack = new ArrayList<Runnable>(1);
+
+	public ModuleConfigs() {
+		//程序启动后获得上下文
+		//attachBaseContext
+		final Pointer handle_attach = new Pointer();
+		handle_attach.obj = XposedHelpers.findAndHookMethod(Application.class, "attach", Context.class, new XC_MethodHook() {
+				@Override
+				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+					ModuleConfigs.this.setContext((Context)param.args[0]);
+					XposedBridge.log("attach: " + ModuleConfigs.this.getRunPackage() + " Context已获取");
+					//获得上下文后刷新模块开关状态
+					ModuleConfigs.this.upDateSwitch();
+					((XC_MethodHook.Unhook)handle_attach.obj).unhook();
+				}
+			});
+
+		XposedHelpers.findAndHookMethod(Activity.class, "onCreate", Bundle.class, new XC_MethodHook() {
+				@Override
+				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+					XposedBridge.log("onCreate: " + ModuleConfigs.this.getRunPackage() + " Activity已创建");
+					ModuleConfigs.this.setTopActivity((Activity)param.thisObject);
+					for(Runnable r : createActivityCallBack){
+						r.run();
+					}
+					createActivityCallBack.clear();
+				}
+			});
+		XposedHelpers.findAndHookMethod(Activity.class, "onRestart", new XC_MethodHook() {
+				@Override
+				protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+					XposedBridge.log("onRestart: " + ModuleConfigs.this.getRunPackage() + " Activity已置于可见状态");
+					ModuleConfigs.this.setTopActivity((Activity)param.thisObject);
+				}
+			});
 	}
 
-	public boolean isThisPackage(String runPackageName){
+	public void setOnCreateCallBack(Runnable run) {
+		createActivityCallBack.add(run);
+	}
+
+	public void setTopActivity(Activity newActivity) {
+		topActivity = newActivity;
+	}
+
+	public Activity getTopActivity() {
+		return topActivity;
+	}
+
+	public void modInit() {
+		for (HookModule hm : modList.values()) {
+			hm.setModuleConfigs(this);
+			try {
+				hm.load();
+			} catch (Throwable e) {
+
+			}
+			XposedBridge.log("模块:" + hm.getModuleId() + "(" + hm.getModuleName() + ")" + (hm.isLoadSuccess() ?"加载成功": "加载失败"));
+		}
+	}
+
+	public void setProcName(String procName) {
+		this.procName = procName;
+		XposedBridge.log("进程:" + procName);
+	}
+
+	public static boolean isThisPackage(String runPackageName) {
 		return runPackageName.equals(thisPackage);
 	}
 
-	public boolean isTargetPackage(String runPackageName){
+	public static boolean isTargetPackage(String runPackageName) {
 		return hookPackages.contains(runPackageName);
 	}
 
-	public void setLoadPackageParam(XC_LoadPackage.LoadPackageParam lpparam){
+	public void setLoadPackageParam(XC_LoadPackage.LoadPackageParam lpparam) {
 		this.loadPackage = lpparam;
 	}
-	
-	public XC_LoadPackage.LoadPackageParam getLoadPackageParam(){
+
+	public XC_LoadPackage.LoadPackageParam getLoadPackageParam() {
 		return loadPackage;
 	}
 
-	public Context getContext(){
+	public Context getContext() {
 		return con;
 	}
 
-	public void setRunPackage(String packageName){
+	public void setRunPackage(String packageName) {
 		runPackage = packageName;
 	}
-	
-	public String getRunPackage(){
+
+	public String getRunPackage() {
 		return runPackage;
 	}
 
-	public void setContext(Context con){
+	public void setContext(Context con) {
 		this.con = con;
 	}
 
-	public SharedPreferences getConf(){
-		if (conf == null){
+	private SharedPreferences getConf() {
+		if (conf == null) {
 			conf = con.getSharedPreferences(thisAppName, Context.MODE_PRIVATE);
 		}
 		return conf;
 	}
 
-	public static ModuleConfigs getInstance(){
-		return INSTANCE;
+	public void addHookModule(HookModule hMod) {
+		modList.put(hMod.getModuleId(), hMod);
 	}
-	
-	public void addHookModule(HookModule hMod){
-		modList.put(hMod.getModuleId(),hMod);
-	}
-	
-	public void upDateSwitch(){
+
+	public void upDateSwitch() {
 		SharedPreferences sp = getConf();
-		for(HookModule h : modList.values()){
-			boolean switchOn = sp.getBoolean(h.getModuleId(),/*false*/true);
-			h.setSwitchOn(switchOn);
-			XposedBridge.log("模块 " + h.getModuleName() +" 激活状态变更 -> " + switchOn);
+		for (HookModule h : modList.values()) {
+			if (h.isLoadSuccess()) {
+				boolean switchOn = sp.getBoolean(h.getModuleId(),/*false*/true);
+				h.setSwitchOn(switchOn);
+				XposedBridge.log("模块 " + h.getModuleName() + " 激活状态变更 -> " + switchOn);
+			}
 		}
 	}
-	
-	public void setSwitch(String moduleNmae,boolean switchOn){
-		
+
+	public void setSwitch(String moduleId, boolean switchOn) {
+		SharedPreferences sp = getConf();
+		SharedPreferences.Editor e = sp.edit();
+		e.putBoolean(moduleId, switchOn);
+		e.apply();
+		modList.get(moduleId).setSwitchOn(switchOn);
+	}
+
+	public void setSwitch(boolean switchOn) {
+		SharedPreferences sp = getConf();
+		SharedPreferences.Editor e = sp.edit();
+		for (Map.Entry<String, HookModule> entry : modList.entrySet()) {
+            String id = entry.getKey();
+            HookModule hm = entry.getValue();
+			hm.setSwitchOn(switchOn);
+			e.putBoolean(id, switchOn);
+        }
+		e.apply();
 	}
 
 }

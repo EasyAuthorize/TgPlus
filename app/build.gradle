@@ -1,26 +1,47 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 29
-    buildToolsVersion "29.0.3"
+	compileSdkVersion 29
+	//buildToolsVersion "29.0.3"
 
-    defaultConfig {
-        applicationId "com.easy.tgPlus"
-        minSdkVersion 19
-        targetSdkVersion 29
-        versionCode 10003
-        versionName "1.0.3"
-    }
+	//设置NDK版本，需要先在高级设置中安装NDK
+	ndkVersion "24.0.8215888"
+	
+	externalNativeBuild {
+		cmake {
+			path "src/main/jni/CMakeLists.txt"
+			version "3.17.2"
+			
+		}
+	}
 
-    buildTypes {
-        release {
-            minifyEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
+	defaultConfig {
+		applicationId "com.easy.tgPlus"
+		minSdkVersion 19
+		targetSdkVersion 29
+		versionCode 10003
+		versionName "1.0.3"
+		
+		externalNativeBuild {
+			cmake {
+				arguments '-DANDROID_ARM_NEON=TRUE',
+				'-DANDROID_TOOLCHAIN=clang'
+			}
+			ndk {
+				abiFilters  'armeabi-v7a','arm64-v8a','x86','x86_64'
+			}
+		}
+	}
+
+	buildTypes {
+		release {
+			minifyEnabled true
+			proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+		}
+	}
 }
 
 dependencies {
 	compileOnly files('libs/XposedBridgeAPI-89.jar')
-    //implementation fileTree(dir: "libs", include: ["*.jar"])
+	//implementation fileTree(dir: "libs", include: ["*.jar"])
 }

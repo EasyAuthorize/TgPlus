@@ -53,7 +53,7 @@ public class Repeater extends HookModule {
     @Override
 	public boolean init() throws Throwable {
 		//解锁复制保存
-		final ModuleConfigs modConf = ModuleConfigs.getInstance();
+		final ModuleConfigs modConf = this.getModuleConfigs();
 		final XC_LoadPackage.LoadPackageParam lpparam = modConf.getLoadPackageParam();
 
 		//复读机
@@ -66,6 +66,7 @@ public class Repeater extends HookModule {
 					Resources res = modConf.getContext().getResources();
 					final Object t = param.thisObject;
 					XposedBridge.log(t.toString());
+
 					final Object main = XposedHelpers.getObjectField(t, "this$0");
 					final Context con = (Context)XposedHelpers.callMethod(main, "getParentActivity");
 					Object popupLayout = param.args[0];

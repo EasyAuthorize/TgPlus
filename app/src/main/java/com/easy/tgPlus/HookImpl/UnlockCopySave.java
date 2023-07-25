@@ -14,7 +14,6 @@ public class UnlockCopySave extends HookModule {
 		return false;
 	}
 
-
     //模块标签
     public static final String ModuleId = "UnlockCopySave";
 	//模块名称
@@ -40,8 +39,8 @@ public class UnlockCopySave extends HookModule {
 	@Override
 	public boolean init() throws Throwable{
 		//解锁复制保存
-		ModuleConfigs mofConf = ModuleConfigs.getInstance();
-		XC_LoadPackage.LoadPackageParam lpparam = mofConf.getLoadPackageParam();
+		ModuleConfigs modConf = this.getModuleConfigs();
+		XC_LoadPackage.LoadPackageParam lpparam = modConf.getLoadPackageParam();
 		try{
 			XposedHelpers.findAndHookMethod("org.telegram.messenger.MessagesController", 
 				lpparam.classLoader, 
