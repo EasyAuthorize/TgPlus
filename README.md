@@ -7,7 +7,7 @@ Xposed-Modules-Repo
 
 ## 模块简介
 这是一个Xposed模块  
-***此项目使用GPTv3许可证***
+***此项目使用GPLv3许可证***
 
 ## 食用方法
 请提前准备好Xposed环境  
